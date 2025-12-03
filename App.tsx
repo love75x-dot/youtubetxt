@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
-import { Wand2, Youtube, FileText, Loader2, AlertCircle } from 'lucide-react';
+import { Wand2, Youtube, FileText, Loader2, AlertCircle, Film, Image } from 'lucide-react';
 import { analyzeScript, generateTopics, writeNewScript } from './services/geminiService';
 import { AppStep, ScriptAnalysis, TopicRecommendation, GeneratedScript } from './types';
 import AnalysisDisplay from './components/AnalysisDisplay';
 import TopicSelector from './components/TopicSelector';
 import ScriptEditor from './components/ScriptEditor';
+import LongFormScriptGenerator from './components/LongFormScriptGenerator';
+
+type AppMode = 'analysis' | 'longform' | 'thumbnail';
 
 const App: React.FC = () => {
+  const [mode, setMode] = useState<AppMode>('analysis');
   const [apiKey, setApiKey] = useState('');
   const [showApiKeyInput, setShowApiKeyInput] = useState(true);
   const [step, setStep] = useState<AppStep>(AppStep.INPUT);
@@ -110,21 +114,80 @@ const App: React.FC = () => {
   // Render Helpers
   const renderHeader = () => (
     <header className="bg-neutral-900 border-b border-neutral-700 py-4 px-6 sticky top-0 z-50 shadow-md">
-      <div className="max-w-6xl mx-auto flex items-center justify-between">
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => step !== AppStep.GENERATING && handleReset()}>
-          <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center shadow-lg shadow-red-900/20">
-            <Youtube className="text-white" size={24} />
+      <div className="max-w-6xl mx-auto">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => {
+            if (step !== AppStep.GENERATING) {
+              handleReset();
+              setMode('analysis');
+            }
+          }}>
+            <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center shadow-lg shadow-red-900/20">
+              <Youtube className="text-white" size={24} />
+            </div>
+            <h1 className="text-xl font-bold text-white tracking-tight">
+              유튜브 대본 AI
+            </h1>
           </div>
-          <h1 className="text-xl font-bold text-white tracking-tight">
-            유튜브 대본 AI
-          </h1>
+          
+          {step !== AppStep.INPUT && step !== AppStep.RESULT && mode === 'analysis' && (
+             <div className="text-sm text-gray-300 hidden md:block font-medium">
+                Gemini 2.5 Flash 기반
+             </div>
+          )}
         </div>
-        
-        {step !== AppStep.INPUT && step !== AppStep.RESULT && (
-           <div className="text-sm text-gray-300 hidden md:block font-medium">
-              Gemini 2.5 Flash 기반
-           </div>
-        )}
+
+        {/* 모드 전환 탭 */}
+        <div className="flex gap-2 bg-neutral-800 rounded-lg p-1 border border-neutral-600">
+          <button
+            onClick={() => {
+              setMode('analysis');
+              handleReset();
+            }}
+            className={`flex-1 px-4 py-2.5 rounded-md font-medium transition-all ${
+              mode === 'analysis'
+                ? 'bg-purple-600 text-white'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <span className="flex items-center justify-center gap-2">
+              <FileText size={18} />
+              <span className="hidden sm:inline">분석 & 생성</span>
+            </span>
+          </button>
+          <button
+            onClick={() => {
+              setMode('longform');
+              handleReset();
+            }}
+            className={`flex-1 px-4 py-2.5 rounded-md font-medium transition-all ${
+              mode === 'longform'
+                ? 'bg-purple-600 text-white'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <span className="flex items-center justify-center gap-2">
+              <Film size={18} />
+              <span className="hidden sm:inline">롱폼 1만자</span>
+            </span>
+          </button>
+          <button
+            onClick={() => {
+              setMode('thumbnail');
+              handleReset();
+            }}
+            className={`flex-1 px-4 py-2.5 rounded-md font-medium transition-all ${
+              mode === 'thumbnail'
+                ? 'bg-purple-600 text-white'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <span className="flex items-center justify-center gap-2">
+              <Image size={18} />
+              <span className="hidden sm:inline">썸네일</span>
+            </span>
+          </button>
+        </div>
       </div>
     </header>
   );
@@ -229,36 +292,48 @@ const App: React.FC = () => {
       {renderHeader()}
 
       <main className="container mx-auto px-4 py-12">
-        {step === AppStep.INPUT && renderInputScreen()}
-
-        {step === AppStep.ANALYZING && renderLoadingOverlay("스타일 및 패턴 분석 중...")}
-
-        {step === AppStep.TOPICS && analysis && (
-          <div className="max-w-5xl mx-auto space-y-8">
-            <div className="flex items-center justify-between border-b border-neutral-700 pb-4">
-              <h2 className="text-2xl font-bold text-white">분석 결과 및 추천 주제</h2>
-              <button onClick={handleReset} className="text-sm text-gray-300 hover:text-white transition-colors underline decoration-dotted font-medium">
-                처음으로 돌아가기
-              </button>
-            </div>
-            
-            <AnalysisDisplay analysis={analysis} />
-            <TopicSelector 
-              topics={topics} 
-              onSelect={handleGenerateScript} 
-            />
+        {mode === 'longform' ? (
+          <LongFormScriptGenerator />
+        ) : mode === 'thumbnail' ? (
+          <div className="text-center text-gray-400 py-20">
+            <Image size={64} className="mx-auto mb-4 text-gray-600" />
+            <h3 className="text-2xl font-bold mb-2">썸네일 생성 기능</h3>
+            <p>곧 출시됩니다!</p>
           </div>
-        )}
+        ) : (
+          <>
+            {step === AppStep.INPUT && renderInputScreen()}
 
-        {step === AppStep.GENERATING && renderLoadingOverlay("AI가 30초 룰을 적용한 맞춤형 대본을 작성하고 있습니다...")}
+            {step === AppStep.ANALYZING && renderLoadingOverlay("스타일 및 패턴 분석 중...")}
 
-        {step === AppStep.RESULT && generatedScript && (
-          <ScriptEditor 
-            script={generatedScript} 
-            onReset={handleReset} 
-            onBack={handleBackToTopics}
-            onUpdate={handleScriptUpdate}
-          />
+            {step === AppStep.TOPICS && analysis && (
+              <div className="max-w-5xl mx-auto space-y-8">
+                <div className="flex items-center justify-between border-b border-neutral-700 pb-4">
+                  <h2 className="text-2xl font-bold text-white">분석 결과 및 추천 주제</h2>
+                  <button onClick={handleReset} className="text-sm text-gray-300 hover:text-white transition-colors underline decoration-dotted font-medium">
+                    처음으로 돌아가기
+                  </button>
+                </div>
+                
+                <AnalysisDisplay analysis={analysis} />
+                <TopicSelector 
+                  topics={topics} 
+                  onSelect={handleGenerateScript} 
+                />
+              </div>
+            )}
+
+            {step === AppStep.GENERATING && renderLoadingOverlay("AI가 30초 룰을 적용한 맞춤형 대본을 작성하고 있습니다...")}
+
+            {step === AppStep.RESULT && generatedScript && (
+              <ScriptEditor 
+                script={generatedScript} 
+                onReset={handleReset} 
+                onBack={handleBackToTopics}
+                onUpdate={handleScriptUpdate}
+              />
+            )}
+          </>
         )}
       </main>
     </div>

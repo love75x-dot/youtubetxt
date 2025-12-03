@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { GeneratedScript } from '../types';
-import { Copy, Check, RefreshCw, ArrowLeft, Edit2, Loader2, Youtube, Hash } from 'lucide-react';
+import { GeneratedScript, ScriptVersion } from '../types';
+import { Copy, Check, RefreshCw, ArrowLeft, Edit2, Loader2, Youtube, Hash, Home } from 'lucide-react';
 import { refineScript } from '../services/geminiService';
 
 interface Props {
@@ -15,9 +15,11 @@ const ScriptEditor: React.FC<Props> = ({ script, onReset, onBack, onUpdate }) =>
   const [showRefineModal, setShowRefineModal] = useState(false);
   const [refineInstruction, setRefineInstruction] = useState('');
   const [isRefining, setIsRefining] = useState(false);
+  const [currentVersion, setCurrentVersion] = useState(script.currentVersion || 0);
 
   const handleCopy = () => {
-    const fullText = `# ${script.title}\n\n${script.content}`;
+    const content = getCurrentContent();
+    const fullText = `# ${script.title}\n\n${content}`;
     navigator.clipboard.writeText(fullText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -33,12 +35,30 @@ const ScriptEditor: React.FC<Props> = ({ script, onReset, onBack, onUpdate }) =>
         instruction: refineInstruction
       });
       
+      // 버전 히스토리 생성
+      const versions = script.versions || [{
+        version: 0,
+        content: script.content,
+        timestamp: Date.now(),
+        instruction: '원본 대본'
+      }];
+      
+      const newVersion: ScriptVersion = {
+        version: versions.length,
+        content: refinedContent,
+        timestamp: Date.now(),
+        instruction: refineInstruction
+      };
+      
       const updatedScript: GeneratedScript = {
         ...script,
-        content: refinedContent
+        content: refinedContent,
+        versions: [...versions, newVersion],
+        currentVersion: newVersion.version
       };
       
       onUpdate(updatedScript);
+      setCurrentVersion(newVersion.version);
       setRefineInstruction('');
       setShowRefineModal(false);
     } catch (error) {
@@ -47,6 +67,28 @@ const ScriptEditor: React.FC<Props> = ({ script, onReset, onBack, onUpdate }) =>
     } finally {
       setIsRefining(false);
     }
+  };
+
+  const handleVersionChange = (version: number) => {
+    if (!script.versions || !onUpdate) return;
+    
+    const selectedVersion = script.versions[version];
+    if (selectedVersion) {
+      const updatedScript: GeneratedScript = {
+        ...script,
+        content: selectedVersion.content,
+        currentVersion: version
+      };
+      onUpdate(updatedScript);
+      setCurrentVersion(version);
+    }
+  };
+
+  const getCurrentContent = () => {
+    if (script.versions && script.versions[currentVersion]) {
+      return script.versions[currentVersion].content;
+    }
+    return script.content;
   };
 
   return (
@@ -95,8 +137,8 @@ const ScriptEditor: React.FC<Props> = ({ script, onReset, onBack, onUpdate }) =>
               onClick={onReset}
               className="flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-sm transition-colors font-bold shadow-md hover:shadow-purple-500/20"
             >
-              <RefreshCw size={16} />
-              새로 만들기
+              <Home size={16} />
+              홈
             </button>
           </div>
         </div>
@@ -150,10 +192,40 @@ const ScriptEditor: React.FC<Props> = ({ script, onReset, onBack, onUpdate }) =>
           <div className="prose prose-invert max-w-none prose-headings:text-purple-300 prose-p:text-gray-100 prose-strong:text-white prose-li:text-gray-200 prose-blockquote:text-gray-300 prose-blockquote:border-purple-500">
             <h1 className="text-3xl font-extrabold mb-8 pb-4 border-b border-neutral-600 leading-tight text-white">{script.title}</h1>
             <div className="whitespace-pre-wrap font-sans text-lg leading-loose text-white">
-              {script.content}
+              {getCurrentContent()}
             </div>
           </div>
         </div>
+
+        {/* 버전 히스토리 */}
+        {script.versions && script.versions.length > 1 && (
+          <div className="p-4 bg-neutral-900 border-t border-neutral-600">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-sm text-gray-400 font-medium">대본 버전:</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {script.versions.map((version, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleVersionChange(index)}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                    currentVersion === index
+                      ? 'bg-purple-600 text-white border-2 border-purple-400'
+                      : 'bg-neutral-800 text-gray-300 border border-neutral-600 hover:bg-neutral-700'
+                  }`}
+                  title={version.instruction || '원본 대본'}
+                >
+                  {index + 1}
+                </button>
+              ))}
+            </div>
+            {script.versions[currentVersion]?.instruction && (
+              <div className="mt-3 text-xs text-gray-400 bg-neutral-800 rounded p-2 border border-neutral-700">
+                <strong>수정 내용:</strong> {script.versions[currentVersion].instruction}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 대본 수정 모달 */}

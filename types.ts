@@ -29,11 +29,41 @@ export interface GeneratedScript {
   youtubeDescription?: string;
   hashtags?: string[];
   topicId?: string; // 주제 식별을 위한 ID
+  versions?: ScriptVersion[]; // 대본 버전 히스토리
+  currentVersion?: number; // 현재 보고 있는 버전
+}
+
+export interface ScriptVersion {
+  version: number;
+  content: string;
+  timestamp: number;
+  instruction?: string; // 어떤 수정 요청이었는지
 }
 
 export interface ScriptRefinementRequest {
   currentScript: string;
   instruction: string; // 사용자의 수정 요청
+}
+
+export interface LongFormScript {
+  topic: string;
+  sessions: {
+    session1: string; // 오프닝 2,000자
+    session2: string; // 전개 2,600자
+    session3: string; // 심화 2,800자
+    session4: string; // 반전/확장 2,600자
+    session5: string; // 결론 2,000자
+  };
+  appendix: {
+    sceneDirections: string;
+    bgmRecommendations: string;
+    estimatedDuration: string;
+    seoMetadata: {
+      titles: string[];
+      description: string;
+      tags: string[];
+    };
+  };
 }
 
 export enum ToneType {

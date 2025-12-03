@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { ScriptAnalysis, TopicRecommendation, HookScript, HookScriptRequest, ToneType, GeneratedScript, ScriptRefinementRequest } from "../types";
+import { ScriptAnalysis, TopicRecommendation, HookScript, HookScriptRequest, ToneType, GeneratedScript, ScriptRefinementRequest, LongFormScript } from "../types";
 
 // Helper to get API key from multiple sources
 const getApiKey = (): string => {
@@ -309,5 +309,107 @@ export const refineScript = async (request: ScriptRefinementRequest): Promise<st
 
   if (!response.text) throw new Error("No refined script generated");
   return response.text;
+};
+
+export const generateLongFormScript = async (topic: string): Promise<LongFormScript> => {
+  const ai = getAI();
+
+  const prompt = `
+    당신은 Vrew 편집에 최적화된 유튜브 롱폼 내레이션 대본 생성기입니다.
+    
+    **역할 정의:**
+    - 톤앤매너: 친근하고 설명 위주, 1인 진행자 시점
+    - 목표: 17~20분 분량의 촬영용 대본 생성 (총 약 10,000자)
+    
+    **주제:** ${topic}
+    
+    **전체 구조 (5개 세션):**
+    
+    1. **[SESSION1] 오프닝 (2,000자)**
+       - 5초 Hook: 강력한 첫 문장으로 시청자의 주의를 끌 것
+       - 30초 Hook: 이 영상을 봐야 하는 이유 제시
+       - 호기심을 자극하는 질문이나 반전 제시
+       
+    2. **[SESSION2] 전개 (2,600자)**
+       - 문제 제기 및 배경 설명
+       - 시청자와 공감대 형성
+       - 왜 이 주제가 중요한지 설명
+       
+    3. **[SESSION3] 심화 (2,800자)**
+       - 구체적인 사례 제시
+       - 입체적 분석 및 다양한 관점 소개
+       - 데이터나 연구 결과 인용 (필요시)
+       
+    4. **[SESSION4] 반전/확장 (2,600자)**
+       - 미드롤 Hook: 시청 피로도를 깨는 반전 또는 새로운 정보
+       - 소프트 CTA: "여기까지 유용하셨다면 좋아요 부탁드려요"
+       - 주제의 확장 또는 실용적 적용
+       
+    5. **[SESSION5] 결론 (2,000자)**
+       - 핵심 내용 요약
+       - FAQ 2개 포함
+       - 강력한 최종 CTA (구독 유도)
+    
+    **작성 규칙:**
+    - 각 세션은 독립적인 블록으로 작성
+    - 문장은 짧게 끊어서 리듬감 있게 작성
+    - 본문에는 오직 '내레이션 대사'만 작성 (지시문 없음)
+    - 자연스럽고 대화하듯이 작성
+    
+    **부록(Appendix) 포함:**
+    - 세션별 장면 지시 (이미지/자막 가이드)
+    - 추천 BGM/효과음
+    - 예상 소요 시간
+    - YouTube SEO (제목 3개, 설명, 태그)
+    
+    JSON 형식으로 응답해주세요.
+  `;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          topic: { type: Type.STRING },
+          sessions: {
+            type: Type.OBJECT,
+            properties: {
+              session1: { type: Type.STRING, description: "오프닝 2,000자" },
+              session2: { type: Type.STRING, description: "전개 2,600자" },
+              session3: { type: Type.STRING, description: "심화 2,800자" },
+              session4: { type: Type.STRING, description: "반전/확장 2,600자" },
+              session5: { type: Type.STRING, description: "결론 2,000자" }
+            },
+            required: ["session1", "session2", "session3", "session4", "session5"]
+          },
+          appendix: {
+            type: Type.OBJECT,
+            properties: {
+              sceneDirections: { type: Type.STRING, description: "세션별 장면 지시" },
+              bgmRecommendations: { type: Type.STRING, description: "BGM/효과음 추천" },
+              estimatedDuration: { type: Type.STRING, description: "예상 소요 시간" },
+              seoMetadata: {
+                type: Type.OBJECT,
+                properties: {
+                  titles: { type: Type.ARRAY, items: { type: Type.STRING }, description: "제목 3개" },
+                  description: { type: Type.STRING, description: "YouTube 설명" },
+                  tags: { type: Type.ARRAY, items: { type: Type.STRING }, description: "태그" }
+                },
+                required: ["titles", "description", "tags"]
+              }
+            },
+            required: ["sceneDirections", "bgmRecommendations", "estimatedDuration", "seoMetadata"]
+          }
+        },
+        required: ["topic", "sessions", "appendix"]
+      }
+    }
+  });
+
+  if (!response.text) throw new Error("No long-form script generated");
+  return JSON.parse(response.text) as LongFormScript;
 };
 
