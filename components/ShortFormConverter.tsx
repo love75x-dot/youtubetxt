@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Zap, Copy, CheckCircle2, Sparkles, ArrowLeft, Edit2, Home } from "lucide-react";
-import { convertToShortForm } from "../services/geminiService";
+import { Zap, Copy, CheckCircle2, Sparkles, ArrowLeft, Edit2, Home, Loader2 } from "lucide-react";
+import { convertToShortForm, refineShortForm } from "../services/geminiService";
 
 interface ShortFormConverterProps {
   onBack: () => void;
@@ -22,6 +22,9 @@ export default function ShortFormConverter({
   const [isConverting, setIsConverting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
+  const [showRefineModal, setShowRefineModal] = useState(false);
+  const [refineInstruction, setRefineInstruction] = useState("");
+  const [isRefining, setIsRefining] = useState(false);
 
   const handleConvert = async () => {
     if (!longFormInput.trim()) {
@@ -47,6 +50,27 @@ export default function ShortFormConverter({
     await navigator.clipboard.writeText(shortFormOutput);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleRefine = async () => {
+    if (!refineInstruction.trim()) return;
+    
+    setIsRefining(true);
+    try {
+      const refinedScript = await refineShortForm({
+        currentScript: shortFormOutput,
+        instruction: refineInstruction
+      });
+      
+      setShortFormOutput(refinedScript);
+      setRefineInstruction('');
+      setShowRefineModal(false);
+    } catch (error) {
+      console.error('Short-form script refinement failed:', error);
+      setError('대본 수정 중 오류가 발생했습니다.');
+    } finally {
+      setIsRefining(false);
+    }
   };
 
   return (
@@ -159,26 +183,35 @@ export default function ShortFormConverter({
       {shortFormOutput && (
         <div className="space-y-3 animate-fadeIn">
           <div className="flex items-center justify-between">
-            <label className="text-lg font-semibold text-gray-700 flex items-center gap-2">
+            <label className="text-lg font-semibold text-white flex items-center gap-2">
               <Zap className="w-5 h-5 text-yellow-500" />
               숏폼 대본 (30~60초)
             </label>
-            <button
-              onClick={handleCopy}
-              className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
-            >
-              {copied ? (
-                <>
-                  <CheckCircle2 className="w-4 h-4" />
-                  복사됨!
-                </>
-              ) : (
-                <>
-                  <Copy className="w-4 h-4" />
-                  복사하기
-                </>
-              )}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowRefineModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors font-medium"
+              >
+                <Edit2 className="w-4 h-4" />
+                수정
+              </button>
+              <button
+                onClick={handleCopy}
+                className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
+              >
+                {copied ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    복사됨!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    복사하기
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
           <div className="bg-gradient-to-br from-neutral-800 to-neutral-900 border-2 border-yellow-500 rounded-lg p-6 shadow-lg">
@@ -197,6 +230,65 @@ export default function ShortFormConverter({
               ✨ <strong>숏폼 최적화 완료!</strong> 위 대본은 30~60초 분량으로 압축되어 
               첫 3초에 강력한 Hook이 있고, 핵심 메시지만 빠르게 전달하도록 설계되었습니다.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* 숏폼 대본 수정 모달 */}
+      {showRefineModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowRefineModal(false)}>
+          <div className="bg-neutral-900 rounded-xl border border-neutral-600 max-w-2xl w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <Edit2 size={24} className="text-blue-400" />
+              숏폼 대본 수정하기
+            </h3>
+            
+            <p className="text-gray-300 mb-4 text-sm">
+              어떻게 숏폼 대본을 수정하고 싶으신가요? 구체적으로 설명해주세요.
+            </p>
+            
+            <div className="space-y-3 mb-4">
+              <div className="text-xs text-gray-400">
+                <strong>예시:</strong>
+                <ul className="list-disc list-inside mt-1 space-y-1">
+                  <li>"더 강렬한 Hook으로 바꿔줘"</li>
+                  <li>"템포를 더 빠르게 만들어줘"</li>
+                  <li>"친근한 말투로 변경해줘"</li>
+                  <li>"첫 문장을 질문 형태로 바꿔줘"</li>
+                </ul>
+              </div>
+            </div>
+            
+            <textarea
+              value={refineInstruction}
+              onChange={(e) => setRefineInstruction(e.target.value)}
+              placeholder="수정 요청 사항을 입력하세요..."
+              className="w-full h-32 bg-neutral-950 border border-neutral-600 rounded-lg p-4 text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+            />
+            
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => setShowRefineModal(false)}
+                className="flex-1 px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-gray-200 rounded-lg font-medium transition-colors"
+                disabled={isRefining}
+              >
+                취소
+              </button>
+              <button
+                onClick={handleRefine}
+                disabled={!refineInstruction.trim() || isRefining}
+                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-lg font-bold transition-colors flex items-center justify-center gap-2"
+              >
+                {isRefining ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />
+                    수정 중...
+                  </>
+                ) : (
+                  '대본 수정하기'
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

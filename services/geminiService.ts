@@ -463,3 +463,34 @@ export const convertToShortForm = async (longFormScript: string): Promise<string
   return response.text;
 };
 
+export const refineShortForm = async (request: { currentScript: string; instruction: string }): Promise<string> => {
+  const ai = getAI();
+
+  const prompt = `
+    다음 숏폼 YouTube 대본을 사용자의 요청에 따라 수정해주세요.
+
+    **현재 숏폼 대본:**
+    ${request.currentScript}
+
+    **사용자 수정 요청:**
+    ${request.instruction}
+
+    **수정 규칙:**
+    - 사용자의 요청을 정확히 반영할 것
+    - 30~60초 숏폼 형식 유지 (150~300자)
+    - 첫 3초 Hook은 반드시 유지할 것
+    - 빠른 템포와 강렬한 톤 유지
+    - 수정된 대본만 출력 (마크다운 형식)
+
+    수정된 숏폼 대본:
+  `;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: prompt,
+  });
+
+  if (!response.text) throw new Error("No refined short-form script generated");
+  return response.text;
+};
+
