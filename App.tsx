@@ -21,6 +21,10 @@ const App: React.FC = () => {
   const [scriptCache, setScriptCache] = useState<Map<string, GeneratedScript>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [hasGeneratedScript, setHasGeneratedScript] = useState(false);
+  
+  // 숏폼 변환 상태
+  const [shortFormInput, setShortFormInput] = useState('');
+  const [shortFormOutput, setShortFormOutput] = useState('');
 
   // Check for API key on mount
   React.useEffect(() => {
@@ -149,7 +153,12 @@ const App: React.FC = () => {
         <div className="flex gap-2 bg-neutral-800 rounded-lg p-1 border border-neutral-600">
           <button
             onClick={() => {
-              setMode('analysis');
+              if (topics.length > 0) {
+                setMode('analysis');
+                setStep(AppStep.TOPICS);
+              } else {
+                setMode('analysis');
+              }
             }}
             className={`flex-1 px-4 py-2.5 rounded-md font-medium transition-all ${
               mode === 'analysis'
@@ -300,7 +309,14 @@ const App: React.FC = () => {
 
       <main className="container mx-auto px-4 py-12">
         {mode === 'shortform' ? (
-          <ShortFormConverter onBack={() => setMode(hasGeneratedScript ? 'longform' : 'analysis')} />
+          <ShortFormConverter 
+            onBack={() => setMode(hasGeneratedScript ? 'longform' : 'analysis')}
+            onReset={handleReset}
+            longFormInput={shortFormInput}
+            setLongFormInput={setShortFormInput}
+            shortFormOutput={shortFormOutput}
+            setShortFormOutput={setShortFormOutput}
+          />
         ) : mode === 'longform' && generatedScript ? (
           <ScriptEditor 
             script={generatedScript} 

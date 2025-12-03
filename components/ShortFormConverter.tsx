@@ -1,14 +1,24 @@
 import { useState } from "react";
-import { Zap, Copy, CheckCircle2, Sparkles, ArrowLeft } from "lucide-react";
+import { Zap, Copy, CheckCircle2, Sparkles, ArrowLeft, Edit2, Home } from "lucide-react";
 import { convertToShortForm } from "../services/geminiService";
 
 interface ShortFormConverterProps {
   onBack: () => void;
+  onReset: () => void;
+  longFormInput: string;
+  setLongFormInput: (value: string) => void;
+  shortFormOutput: string;
+  setShortFormOutput: (value: string) => void;
 }
 
-export default function ShortFormConverter({ onBack }: ShortFormConverterProps) {
-  const [longFormInput, setLongFormInput] = useState("");
-  const [shortFormScript, setShortFormScript] = useState("");
+export default function ShortFormConverter({ 
+  onBack, 
+  onReset,
+  longFormInput,
+  setLongFormInput,
+  shortFormOutput,
+  setShortFormOutput
+}: ShortFormConverterProps) {
   const [isConverting, setIsConverting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
@@ -21,11 +31,11 @@ export default function ShortFormConverter({ onBack }: ShortFormConverterProps) 
 
     setIsConverting(true);
     setError("");
-    setShortFormScript("");
+    setShortFormOutput("");
 
     try {
       const result = await convertToShortForm(longFormInput);
-      setShortFormScript(result);
+      setShortFormOutput(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "변환 중 오류가 발생했습니다.");
     } finally {
@@ -34,7 +44,7 @@ export default function ShortFormConverter({ onBack }: ShortFormConverterProps) 
   };
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(shortFormScript);
+    await navigator.clipboard.writeText(shortFormOutput);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -42,18 +52,43 @@ export default function ShortFormConverter({ onBack }: ShortFormConverterProps) 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors font-medium"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            홈
-          </button>
+      <div className="bg-neutral-800 rounded-xl border border-neutral-600 shadow-2xl overflow-hidden mb-6">
+        <div className="bg-neutral-900 border-b border-neutral-600 p-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Zap className="w-6 h-6 text-yellow-500" />
             <h2 className="text-2xl font-bold text-white">숏폼 대본 변환</h2>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onBack}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg text-sm transition-colors font-medium"
+            >
+              <ArrowLeft size={16} />
+              이전
+            </button>
+            
+            {shortFormOutput && (
+              <button
+                onClick={() => {
+                  setShortFormOutput('');
+                  setLongFormInput('');
+                  setError('');
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm transition-colors font-medium"
+              >
+                <Edit2 size={16} />
+                수정
+              </button>
+            )}
+            
+            <button
+              onClick={onReset}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-sm transition-colors font-medium"
+            >
+              <Home size={16} />
+              홈
+            </button>
           </div>
         </div>
       </div>
@@ -121,7 +156,7 @@ export default function ShortFormConverter({ onBack }: ShortFormConverterProps) 
       )}
 
       {/* Short Form Output */}
-      {shortFormScript && (
+      {shortFormOutput && (
         <div className="space-y-3 animate-fadeIn">
           <div className="flex items-center justify-between">
             <label className="text-lg font-semibold text-gray-700 flex items-center gap-2">
@@ -150,7 +185,7 @@ export default function ShortFormConverter({ onBack }: ShortFormConverterProps) 
             <div 
               className="prose prose-invert max-w-none whitespace-pre-wrap text-white text-base leading-relaxed"
               dangerouslySetInnerHTML={{
-                __html: shortFormScript
+                __html: shortFormOutput
                   .replace(/\*\*(.*?)\*\*/g, '<strong class="text-yellow-300">$1</strong>')
                   .replace(/\n/g, '<br/>')
               }}
