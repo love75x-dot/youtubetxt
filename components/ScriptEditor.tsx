@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { GeneratedScript } from '../types';
-import { Copy, Check, RefreshCw, Download, FileText } from 'lucide-react';
+import { Copy, Check, RefreshCw, Download, FileText, ArrowLeft } from 'lucide-react';
 
 interface Props {
   script: GeneratedScript;
   onReset: () => void;
+  onBack?: () => void;
 }
 
-const ScriptEditor: React.FC<Props> = ({ script, onReset }) => {
+const ScriptEditor: React.FC<Props> = ({ script, onReset, onBack }) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -41,6 +42,16 @@ const ScriptEditor: React.FC<Props> = ({ script, onReset }) => {
           </div>
           
           <div className="flex items-center gap-2 shrink-0">
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="flex items-center gap-2 px-3 py-2 bg-neutral-700 hover:bg-neutral-600 text-gray-100 rounded-lg text-sm transition-colors border border-neutral-500 font-medium hover:border-neutral-400"
+              >
+                <ArrowLeft size={16} />
+                이전으로
+              </button>
+            )}
+            
             <button
               onClick={handleCopy}
               className="flex items-center gap-2 px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-gray-100 rounded-lg text-sm transition-colors border border-neutral-500 font-medium hover:border-neutral-400"

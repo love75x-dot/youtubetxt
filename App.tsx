@@ -1,16 +1,12 @@
 import React, { useState } from 'react';
-import { Wand2, Youtube, FileText, Loader2, AlertCircle, Sparkles } from 'lucide-react';
+import { Wand2, Youtube, FileText, Loader2, AlertCircle } from 'lucide-react';
 import { analyzeScript, generateTopics, writeNewScript } from './services/geminiService';
 import { AppStep, ScriptAnalysis, TopicRecommendation, GeneratedScript } from './types';
 import AnalysisDisplay from './components/AnalysisDisplay';
 import TopicSelector from './components/TopicSelector';
 import ScriptEditor from './components/ScriptEditor';
-import HookScriptGenerator from './components/HookScriptGenerator';
-
-type AppMode = 'analysis' | 'hook';
 
 const App: React.FC = () => {
-  const [mode, setMode] = useState<AppMode>('analysis');
   const [apiKey, setApiKey] = useState('');
   const [showApiKeyInput, setShowApiKeyInput] = useState(true);
   const [step, setStep] = useState<AppStep>(AppStep.INPUT);
@@ -87,6 +83,10 @@ const App: React.FC = () => {
     setError(null);
   };
 
+  const handleBackToTopics = () => {
+    setStep(AppStep.TOPICS);
+  };
+
   // Render Helpers
   const renderHeader = () => (
     <header className="bg-neutral-900 border-b border-neutral-700 py-4 px-6 sticky top-0 z-50 shadow-md">
@@ -100,49 +100,11 @@ const App: React.FC = () => {
           </h1>
         </div>
         
-        <div className="flex items-center gap-4">
-          {/* 모드 전환 탭 */}
-          <div className="flex gap-2 bg-neutral-800 rounded-lg p-1 border border-neutral-600">
-            <button
-              onClick={() => {
-                setMode('analysis');
-                handleReset();
-              }}
-              className={`px-4 py-2 rounded-md font-medium transition-all ${
-                mode === 'analysis'
-                  ? 'bg-purple-600 text-white'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <FileText size={18} />
-                분석 & 생성
-              </span>
-            </button>
-            <button
-              onClick={() => {
-                setMode('hook');
-                handleReset();
-              }}
-              className={`px-4 py-2 rounded-md font-medium transition-all ${
-                mode === 'hook'
-                  ? 'bg-purple-600 text-white'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Sparkles size={18} />
-                30초 훅
-              </span>
-            </button>
-          </div>
-
-          {step !== AppStep.INPUT && step !== AppStep.RESULT && mode === 'analysis' && (
-            <div className="text-sm text-gray-300 hidden md:block font-medium">
+        {step !== AppStep.INPUT && step !== AppStep.RESULT && (
+           <div className="text-sm text-gray-300 hidden md:block font-medium">
               Gemini 2.5 Flash 기반
-            </div>
-          )}
-        </div>
+           </div>
+        )}
       </div>
     </header>
   );
@@ -247,37 +209,31 @@ const App: React.FC = () => {
       {renderHeader()}
 
       <main className="container mx-auto px-4 py-12">
-        {mode === 'hook' ? (
-          <HookScriptGenerator />
-        ) : (
-          <>
-            {step === AppStep.INPUT && renderInputScreen()}
+        {step === AppStep.INPUT && renderInputScreen()}
 
-            {step === AppStep.ANALYZING && renderLoadingOverlay("스타일 및 패턴 분석 중...")}
+        {step === AppStep.ANALYZING && renderLoadingOverlay("스타일 및 패턴 분석 중...")}
 
-            {step === AppStep.TOPICS && analysis && (
-              <div className="max-w-5xl mx-auto space-y-8">
-                <div className="flex items-center justify-between border-b border-neutral-700 pb-4">
-                  <h2 className="text-2xl font-bold text-white">분석 결과 및 추천 주제</h2>
-                  <button onClick={handleReset} className="text-sm text-gray-300 hover:text-white transition-colors underline decoration-dotted font-medium">
-                    처음으로 돌아가기
-                  </button>
-                </div>
-                
-                <AnalysisDisplay analysis={analysis} />
-                <TopicSelector 
-                  topics={topics} 
-                  onSelect={handleGenerateScript} 
-                />
-              </div>
-            )}
+        {step === AppStep.TOPICS && analysis && (
+          <div className="max-w-5xl mx-auto space-y-8">
+            <div className="flex items-center justify-between border-b border-neutral-700 pb-4">
+              <h2 className="text-2xl font-bold text-white">분석 결과 및 추천 주제</h2>
+              <button onClick={handleReset} className="text-sm text-gray-300 hover:text-white transition-colors underline decoration-dotted font-medium">
+                처음으로 돌아가기
+              </button>
+            </div>
+            
+            <AnalysisDisplay analysis={analysis} />
+            <TopicSelector 
+              topics={topics} 
+              onSelect={handleGenerateScript} 
+            />
+          </div>
+        )}
 
-            {step === AppStep.GENERATING && renderLoadingOverlay("AI가 맞춤형 대본을 작성하고 있습니다...")}
+        {step === AppStep.GENERATING && renderLoadingOverlay("AI가 30초 룰을 적용한 맞춤형 대본을 작성하고 있습니다...")}
 
-            {step === AppStep.RESULT && generatedScript && (
-              <ScriptEditor script={generatedScript} onReset={handleReset} />
-            )}
-          </>
+        {step === AppStep.RESULT && generatedScript && (
+          <ScriptEditor script={generatedScript} onReset={handleReset} onBack={handleBackToTopics} />
         )}
       </main>
     </div>

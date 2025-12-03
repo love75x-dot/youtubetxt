@@ -103,17 +103,44 @@ export const writeNewScript = async (topic: TopicRecommendation, analysis: Scrip
   const ai = getAI();
 
   const prompt = `
-    Write a complete YouTube video script for the topic: "${topic.title}".
-    
-    Constraint:
-    1. Mimic the writing style, tone, and pacing found in the analysis.
-    2. Target Audience: ${analysis.targetAudience}.
-    3. Writing Style: ${analysis.writingStyle}.
-    4. Structure: Hook (0-60s), Intro, Body (3-4 key points), Conclusion/CTA.
-    5. Language: Korean.
-    6. Include formatting like [Visual Cue], [Sound Effect], (Host speaking).
-    
-    Topic Premise: ${topic.premise}
+    YouTube 비디오의 완전한 대본을 작성해주세요. 특히 첫 30초가 매우 중요합니다.
+
+    주제: "${topic.title}"
+    타겟 시청자: ${analysis.targetAudience}
+    작성 스타일: ${analysis.writingStyle}
+    톤: ${analysis.tone}
+    주제 설명: ${topic.premise}
+
+    **필수 구조:**
+
+    1. **[0-5초] The Hook**: 시청자의 호기심, 공포, 욕망을 강력하게 자극하는 한 문장
+       - 예: "당신이 유튜브를 망치는 이유가 딱 하나 있습니다."
+       
+    2. **[5-15초] Retention**: 이 영상을 끝까지 봐야 하는 명확한 이유와 이득 제시
+       - 예: "이 영상 끝까지 보시면 조회수 2배로 올리는 법을 알게 됩니다."
+       
+    3. **[15-30초] Roadmap**: 영상의 진행 순서를 간단히 요약하여 신뢰감 제공
+       - 예: "오늘 딱 3가지 단계로 설명드릴게요."
+
+    4. **본문 (Body)**: 3-4개의 핵심 포인트를 다룸
+       - 각 챕터 전환 시 브릿지 멘트 필수 (예: "자, 첫 번째는 알겠죠? 그럼 이걸 어떻게 적용할까요?")
+       - 분석된 톤앤매너를 처음부터 끝까지 일관되게 유지
+       - [Visual Cue], [Sound Effect], (Host speaking) 같은 디렉션 포함
+       
+    5. **중간 CTA**: 본문 중간에 꿀팁을 준 직후 자연스럽게 좋아요/구독 요청
+       - 예: "이 팁 진짜 유용하죠? 까먹기 전에 좋아요 한번 눌러주세요!"
+       
+    6. **엔딩 CTA & 결론**: 영상 마무리에 구독과 다음 영상 시청 유도
+       - 예: "구독하시면 다음 영상에서 더 강력한 팁 알려드릴게요!"
+
+    **중요 규칙:**
+    - 분석된 톤앤매너를 절대 바꾸지 말 것
+    - 브릿지 멘트로 자연스럽게 연결할 것
+    - CTA는 정해진 위치에만 배치할 것
+    - 모든 내용은 한국어로 작성할 것
+    - 30초 구간은 반드시 [0-5초], [5-15초], [15-30초] 태그로 구분할 것
+
+    대본을 마크다운 형식으로 작성해주세요.
   `;
 
   const response = await ai.models.generateContent({
