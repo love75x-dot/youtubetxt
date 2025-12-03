@@ -7,12 +7,28 @@ import TopicSelector from './components/TopicSelector';
 import ScriptEditor from './components/ScriptEditor';
 
 const App: React.FC = () => {
+  const [apiKey, setApiKey] = useState('');
+  const [showApiKeyInput, setShowApiKeyInput] = useState(true);
   const [step, setStep] = useState<AppStep>(AppStep.INPUT);
   const [inputText, setInputText] = useState('');
   const [analysis, setAnalysis] = useState<ScriptAnalysis | null>(null);
   const [topics, setTopics] = useState<TopicRecommendation[]>([]);
   const [generatedScript, setGeneratedScript] = useState<GeneratedScript | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Check for API key on mount
+  React.useEffect(() => {
+    const envApiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    const savedApiKey = localStorage.getItem('gemini_api_key');
+    
+    if (envApiKey && envApiKey !== 'your_api_key_here') {
+      setApiKey(envApiKey);
+      setShowApiKeyInput(false);
+    } else if (savedApiKey) {
+      setApiKey(savedApiKey);
+      setShowApiKeyInput(false);
+    }
+  }, []);
 
   // Handlers
   const handleAnalyze = async () => {
@@ -91,6 +107,41 @@ const App: React.FC = () => {
 
   const renderInputScreen = () => (
     <div className="max-w-3xl mx-auto animate-fade-in">
+      {showApiKeyInput && (
+        <div className="bg-yellow-900/30 border border-yellow-600 rounded-xl p-6 mb-8">
+          <h3 className="text-xl font-bold text-yellow-100 mb-3 flex items-center gap-2">
+            <AlertCircle size={24} />
+            API 키 설정 필요
+          </h3>
+          <p className="text-yellow-200 mb-4 leading-relaxed">
+            Google Gemini API 키를 입력하거나 .env 파일에 VITE_GEMINI_API_KEY를 설정하세요.
+            <br />
+            API 키는 <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="underline hover:text-white">여기</a>에서 발급받을 수 있습니다.
+          </p>
+          <div className="flex gap-3">
+            <input
+              type="password"
+              className="flex-1 bg-neutral-950 text-white border border-neutral-500 rounded-lg px-4 py-2 focus:ring-2 focus:ring-yellow-500 outline-none"
+              placeholder="API 키를 입력하세요..."
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+            />
+            <button
+              onClick={() => {
+                if (apiKey.trim()) {
+                  setShowApiKeyInput(false);
+                  localStorage.setItem('gemini_api_key', apiKey);
+                }
+              }}
+              disabled={!apiKey.trim()}
+              className="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-2 rounded-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              저장
+            </button>
+          </div>
+        </div>
+      )}
+      
       <div className="text-center mb-12">
         <h2 className="text-4xl font-bold mb-4 text-white tracking-tight">
           유튜브 대본 분석 및 생성
@@ -116,7 +167,7 @@ const App: React.FC = () => {
         <div className="mt-6 flex justify-end">
           <button
             onClick={handleAnalyze}
-            disabled={!inputText.trim() || step === AppStep.ANALYZING}
+            disabled={!inputText.trim() || step === AppStep.ANALYZING || showApiKeyInput}
             className="bg-white text-black hover:bg-gray-200 px-8 py-3 rounded-full font-bold text-lg flex items-center gap-2 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-white/10"
           >
             {step === AppStep.ANALYZING ? (
