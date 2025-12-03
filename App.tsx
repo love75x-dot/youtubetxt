@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Wand2, Youtube, FileText, Loader2, AlertCircle, Zap } from 'lucide-react';
 import { analyzeScript, generateTopics, writeNewScript } from './services/geminiService';
-import { AppStep, ScriptAnalysis, TopicRecommendation, GeneratedScript } from './types';
+import { AppStep, ScriptAnalysis, TopicRecommendation, GeneratedScript, ShortFormData, ShortFormRecommendation, ShortFormVersion } from './types';
 import AnalysisDisplay from './components/AnalysisDisplay';
 import TopicSelector from './components/TopicSelector';
 import ScriptEditor from './components/ScriptEditor';
@@ -22,9 +22,11 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [hasGeneratedScript, setHasGeneratedScript] = useState(false);
   
-  // 숏폼 변환 상태
-  const [shortFormInput, setShortFormInput] = useState('');
-  const [shortFormOutput, setShortFormOutput] = useState('');
+  // 현재 선택된 주제
+  const [currentTopicId, setCurrentTopicId] = useState<string>('');
+  
+  // 주제별 숏폼 데이터 저장
+  const [shortFormDataMap, setShortFormDataMap] = useState<Map<string, ShortFormData>>(new Map());
 
   // Check for API key on mount
   React.useEffect(() => {
@@ -67,8 +69,11 @@ const App: React.FC = () => {
   const handleGenerateScript = async (topic: TopicRecommendation) => {
     if (!analysis) return;
     
+    const topicId = topic.title;
+    setCurrentTopicId(topicId);
+    
     // 캐시에서 확인
-    const cachedScript = scriptCache.get(topic.title);
+    const cachedScript = scriptCache.get(topicId);
     if (cachedScript) {
       setGeneratedScript(cachedScript);
       setStep(AppStep.RESULT);
@@ -85,7 +90,7 @@ const App: React.FC = () => {
       setGeneratedScript(script);
       
       // 캐시에 저장
-      setScriptCache(new Map(scriptCache.set(topic.title, script)));
+      setScriptCache(new Map(scriptCache.set(topicId, script)));
       
       setStep(AppStep.RESULT);
       setMode('longform');
@@ -315,10 +320,9 @@ const App: React.FC = () => {
           <ShortFormConverter 
             onBack={() => setMode(hasGeneratedScript ? 'longform' : 'analysis')}
             onReset={handleReset}
-            longFormInput={shortFormInput}
-            setLongFormInput={setShortFormInput}
-            shortFormOutput={shortFormOutput}
-            setShortFormOutput={setShortFormOutput}
+            currentTopicId={currentTopicId}
+            shortFormDataMap={shortFormDataMap}
+            setShortFormDataMap={setShortFormDataMap}
           />
         ) : mode === 'longform' && generatedScript ? (
           <ScriptEditor 
@@ -350,7 +354,7 @@ const App: React.FC = () => {
               </div>
             )}
 
-            {step === AppStep.GENERATING && renderLoadingOverlay("AI가 롱폼 대본을 작성하고 있습니다 (10,000자, 17~20분)...")}
+            {step === AppStep.GENERATING && renderLoadingOverlay("롱폼으로 대본 작성중")}
           </>
         )}
       </main>

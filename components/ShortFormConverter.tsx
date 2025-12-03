@@ -1,31 +1,26 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Zap, Copy, CheckCircle2, Sparkles, ArrowLeft, Edit2, Home, Loader2, TrendingUp } from "lucide-react";
 import { convertToShortForm, refineShortForm } from "../services/geminiService";
-
-interface ShortFormRecommendation {
-  title: string;
-  hook: string;
-  angle: string;
-  estimatedViews: string;
-  script: string;
-}
+import { ShortFormData, ShortFormRecommendation, ShortFormVersion } from "../types";
 
 interface ShortFormConverterProps {
   onBack: () => void;
   onReset: () => void;
-  longFormInput: string;
-  setLongFormInput: (value: string) => void;
-  shortFormOutput: string;
-  setShortFormOutput: (value: string) => void;
+  currentTopicId: string;
+  shortFormDataMap: Map<string, ShortFormData>;
+  setShortFormDataMap: (map: Map<string, ShortFormData>) => void;
+}
+
+interface ShortFormRecWithScript extends ShortFormRecommendation {
+  script: string;
 }
 
 export default function ShortFormConverter({ 
   onBack, 
   onReset,
-  longFormInput,
-  setLongFormInput,
-  shortFormOutput,
-  setShortFormOutput
+  currentTopicId,
+  shortFormDataMap,
+  setShortFormDataMap
 }: ShortFormConverterProps) {
   const [isConverting, setIsConverting] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -33,8 +28,44 @@ export default function ShortFormConverter({
   const [showRefineModal, setShowRefineModal] = useState(false);
   const [refineInstruction, setRefineInstruction] = useState("");
   const [isRefining, setIsRefining] = useState(false);
-  const [recommendations, setRecommendations] = useState<ShortFormRecommendation[]>([]);
-  const [selectedRecommendation, setSelectedRecommendation] = useState<ShortFormRecommendation | null>(null);
+  const [longFormInput, setLongFormInput] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedScript, setEditedScript] = useState("");
+  const [activeTab, setActiveTab] = useState<"recommendations" | "selected">("recommendations");
+  
+  // 현재 주제의 데이터 가져오기
+  const currentData = currentTopicId ? shortFormDataMap.get(currentTopicId) : null;
+  const recommendations = currentData?.recommendations || [];
+  const selectedRecommendation = currentData?.selectedRecommendation || null;
+  const currentScript = currentData?.currentScript || "";
+  const versions = currentData?.versions || [];
+  const currentVersion = currentData?.currentVersion || 0;
+
+  // 현재 버전의 스크립트 가져오기
+  const getCurrentScript = () => {
+    if (versions.length > 0 && versions[currentVersion]) {
+      return versions[currentVersion].script;
+    }
+    return currentScript;
+  };
+
+  // 데이터 업데이트 헬퍼
+  const updateShortFormData = (updates: Partial<ShortFormData>) => {
+    if (!currentTopicId) return;
+    
+    const existing = shortFormDataMap.get(currentTopicId) || {
+      recommendations: [],
+      selectedRecommendation: null,
+      currentScript: "",
+      versions: [],
+      currentVersion: 0
+    };
+    
+    const updated = { ...existing, ...updates };
+    const newMap = new Map(shortFormDataMap);
+    newMap.set(currentTopicId, updated);
+    setShortFormDataMap(newMap);
+  };
 
   const handleConvert = async () => {
     if (!longFormInput.trim()) {
@@ -44,16 +75,19 @@ export default function ShortFormConverter({
 
     setIsConverting(true);
     setError("");
-    setRecommendations([]);
-    setSelectedRecommendation(null);
-    setShortFormOutput("");
 
     try {
       const result = await convertToShortForm(longFormInput);
       const parsed = JSON.parse(result);
       
       if (parsed.recommendations && Array.isArray(parsed.recommendations)) {
-        setRecommendations(parsed.recommendations);
+        updateShortFormData({
+          recommendations: parsed.recommendations,
+          selectedRecommendation: null,
+          currentScript: "",
+          versions: [],
+          currentVersion: 0
+        });
       } else {
         throw new Error("Invalid response format");
       }
@@ -65,13 +99,27 @@ export default function ShortFormConverter({
     }
   };
 
-  const handleSelectRecommendation = (rec: ShortFormRecommendation) => {
-    setSelectedRecommendation(rec);
-    setShortFormOutput(rec.script);
+  const handleSelectRecommendation = (rec: ShortFormRecWithScript) => {
+    const initialVersion: ShortFormVersion = {
+      version: 0,
+      script: rec.script,
+      timestamp: Date.now(),
+      instruction: "원본 AI 추천 대본"
+    };
+
+    updateShortFormData({
+      selectedRecommendation: rec,
+      currentScript: rec.script,
+      versions: [initialVersion],
+      currentVersion: 0
+    });
+    
+    // 선택된 대본 탭으로 이동
+    setActiveTab("selected");
   };
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(shortFormOutput);
+    await navigator.clipboard.writeText(getCurrentScript());
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -82,11 +130,23 @@ export default function ShortFormConverter({
     setIsRefining(true);
     try {
       const refinedScript = await refineShortForm({
-        currentScript: shortFormOutput,
+        currentScript: getCurrentScript(),
         instruction: refineInstruction
       });
       
-      setShortFormOutput(refinedScript);
+      const newVersion: ShortFormVersion = {
+        version: versions.length,
+        script: refinedScript,
+        timestamp: Date.now(),
+        instruction: refineInstruction
+      };
+      
+      updateShortFormData({
+        currentScript: refinedScript,
+        versions: [...versions, newVersion],
+        currentVersion: newVersion.version
+      });
+      
       setRefineInstruction('');
       setShowRefineModal(false);
     } catch (error) {
@@ -97,6 +157,39 @@ export default function ShortFormConverter({
     }
   };
 
+  const handleVersionChange = (versionNum: number) => {
+    updateShortFormData({
+      currentVersion: versionNum
+    });
+  };
+
+  const handleDirectEdit = () => {
+    setIsEditing(true);
+    setEditedScript(getCurrentScript());
+  };
+
+  const handleSaveEdit = () => {
+    const newVersion: ShortFormVersion = {
+      version: versions.length,
+      script: editedScript,
+      timestamp: Date.now(),
+      instruction: "직접 수정"
+    };
+    
+    updateShortFormData({
+      currentScript: editedScript,
+      versions: [...versions, newVersion],
+      currentVersion: newVersion.version
+    });
+    
+    setIsEditing(false);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditedScript("");
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -105,6 +198,11 @@ export default function ShortFormConverter({
           <div className="flex items-center gap-2">
             <Zap className="w-6 h-6 text-yellow-500" />
             <h2 className="text-2xl font-bold text-white">숏폼 대본 변환</h2>
+            {currentTopicId && (
+              <span className="text-sm text-gray-400 ml-2">
+                (주제: {currentTopicId})
+              </span>
+            )}
           </div>
           
           <div className="flex items-center gap-2">
@@ -116,17 +214,22 @@ export default function ShortFormConverter({
               이전
             </button>
             
-            {shortFormOutput && (
+            {currentScript && (
               <button
                 onClick={() => {
-                  setShortFormOutput('');
-                  setLongFormInput('');
-                  setError('');
+                  updateShortFormData({
+                    selectedRecommendation: null,
+                    currentScript: "",
+                    versions: [],
+                    currentVersion: 0
+                  });
+                  setLongFormInput("");
+                  setError("");
                 }}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm transition-colors font-medium"
               >
                 <Edit2 size={16} />
-                수정
+                새로 만들기
               </button>
             )}
             
@@ -141,70 +244,161 @@ export default function ShortFormConverter({
         </div>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <p className="text-sm text-blue-800">
-          💡 롱폼 대본을 입력하면 30~60초 숏폼(Shorts/릴스)용 대본으로 자동 변환됩니다.
-        </p>
-      </div>
-
-      {/* Input Section */}
-      <div className="space-y-3">
-        <label className="block">
-          <span className="text-lg font-semibold text-gray-700">롱폼 대본 입력</span>
-          <span className="text-sm text-gray-500 ml-2">
-            (변환할 롱폼 대본을 붙여넣기 하세요)
-          </span>
-        </label>
-        <textarea
-          value={longFormInput}
-          onChange={(e) => setLongFormInput(e.target.value)}
-          placeholder="롱폼 유튜브 대본을 여기에 붙여넣기 하세요...&#10;&#10;예시:&#10;SESSION1: 오프닝&#10;여러분, 오늘은 정말 중요한 이야기를 해보려고 합니다.&#10;많은 분들이 궁금해하시던...&#10;&#10;(전체 대본 내용)"
-          className="w-full h-64 p-4 border-2 border-gray-600 bg-neutral-800 text-white rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent resize-none text-base leading-relaxed placeholder-gray-500"
-          disabled={isConverting}
-        />
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-500">
-            {longFormInput.length.toLocaleString()}자
-          </span>
-          {longFormInput && (
-            <button
-              onClick={() => setLongFormInput("")}
-              className="text-sm text-red-500 hover:text-red-700"
-            >
-              입력 초기화
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Convert Button */}
-      <button
-        onClick={handleConvert}
-        disabled={isConverting || !longFormInput.trim()}
-        className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-bold py-4 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
-      >
-        {isConverting ? (
-          <>
-            <Sparkles className="w-5 h-5 animate-spin" />
-            숏폼으로 변환 중...
-          </>
-        ) : (
-          <>
-            <Zap className="w-5 h-5" />
-            숏폼 대본으로 변환
-          </>
-        )}
-      </button>
-
-      {/* Error Message */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-700">{error}</p>
+      {!currentTopicId && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <p className="text-sm text-yellow-800">
+            💡 먼저 [분석 & 생성] 탭에서 주제를 선택하고 롱폼 대본을 생성해주세요.
+          </p>
         </div>
       )}
 
-      {/* AI 추천 숏폼 대본 */}
-      {recommendations.length > 0 && !selectedRecommendation && (
+      {/* 추천 목록이 있을 때 탭 UI 표시 */}
+      {currentTopicId && recommendations.length > 0 && selectedRecommendation && (
+        <div className="mb-6">
+          <div className="flex gap-2 border-b border-neutral-600">
+            <button
+              onClick={() => setActiveTab("recommendations")}
+              className={`px-6 py-3 font-semibold transition-all ${
+                activeTab === "recommendations"
+                  ? "text-yellow-500 border-b-2 border-yellow-500"
+                  : "text-gray-400 hover:text-gray-300"
+              }`}
+            >
+              AI 추천 목록 ({recommendations.length}개)
+            </button>
+            <button
+              onClick={() => setActiveTab("selected")}
+              className={`px-6 py-3 font-semibold transition-all ${
+                activeTab === "selected"
+                  ? "text-yellow-500 border-b-2 border-yellow-500"
+                  : "text-gray-400 hover:text-gray-300"
+              }`}
+            >
+              선택된 대본
+            </button>
+          </div>
+        </div>
+      )}
+
+      {currentTopicId && !selectedRecommendation && (
+        <>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p className="text-sm text-blue-800">
+              💡 롱폼 대본을 입력하면 AI가 3~5개의 숏폼 대본을 추천해드립니다.
+            </p>
+          </div>
+
+          {/* Input Section */}
+          <div className="space-y-3">
+            <label className="block">
+              <span className="text-lg font-semibold text-white">롱폼 대본 입력</span>
+              <span className="text-sm text-gray-500 ml-2">
+                (변환할 롱폼 대본을 붙여넣기 하세요)
+              </span>
+            </label>
+            <textarea
+              value={longFormInput}
+              onChange={(e) => setLongFormInput(e.target.value)}
+              placeholder="롱폼 유튜브 대본을 여기에 붙여넣기 하세요...&#10;&#10;예시:&#10;SESSION1: 오프닝&#10;여러분, 오늘은 정말 중요한 이야기를 해보려고 합니다.&#10;많은 분들이 궁금해하시던...&#10;&#10;(전체 대본 내용)"
+              className="w-full h-64 p-4 border-2 border-gray-600 bg-neutral-800 text-white rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent resize-none text-base leading-relaxed placeholder-gray-500"
+              disabled={isConverting}
+            />
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-500">
+                {longFormInput.length.toLocaleString()}자
+              </span>
+              {longFormInput && (
+                <button
+                  onClick={() => setLongFormInput("")}
+                  className="text-sm text-red-500 hover:text-red-700"
+                >
+                  입력 초기화
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Convert Button */}
+          <button
+            onClick={handleConvert}
+            disabled={isConverting || !longFormInput.trim()}
+            className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-bold py-4 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+          >
+            {isConverting ? (
+              <>
+                <Sparkles className="w-5 h-5 animate-spin" />
+                숏폼으로 변환 중...
+              </>
+            ) : (
+              <>
+                <Zap className="w-5 h-5" />
+                숏폼 대본으로 변환
+              </>
+            )}
+          </button>
+
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <p className="text-red-700">{error}</p>
+            </div>
+          )}
+
+          {/* AI 추천 숏폼 대본 */}
+          {recommendations.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-4">
+                <TrendingUp className="w-6 h-6 text-yellow-500" />
+                <h3 className="text-xl font-bold text-white">AI 추천 숏폼 대본</h3>
+                <span className="text-sm text-gray-400">({recommendations.length}개)</span>
+              </div>
+              
+              <div className="grid gap-4">
+                {recommendations.map((rec: any, index) => (
+                  <div
+                    key={index}
+                    onClick={() => handleSelectRecommendation(rec)}
+                    className="bg-gradient-to-br from-neutral-800 to-neutral-900 border-2 border-neutral-600 hover:border-yellow-500 rounded-xl p-6 cursor-pointer transition-all hover:shadow-lg hover:shadow-yellow-500/20"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="px-3 py-1 bg-yellow-600 text-white text-xs font-bold rounded-full">
+                            추천 {index + 1}
+                          </span>
+                          <span className="text-xs text-gray-400">{rec.estimatedViews} 예상</span>
+                        </div>
+                        <h4 className="text-lg font-bold text-white mb-2">{rec.title}</h4>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-start gap-2">
+                        <span className="text-xs font-bold text-yellow-400 mt-1">Hook:</span>
+                        <p className="text-sm text-gray-300 flex-1">{rec.hook}</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-xs font-bold text-blue-400 mt-1">각도:</span>
+                        <p className="text-sm text-gray-300 flex-1">{rec.angle}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-end">
+                      <button className="flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg text-sm font-medium transition-colors">
+                        <Zap className="w-4 h-4" />
+                        이 대본 선택
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* 추천 목록 탭 표시 (선택된 대본이 있을 때) */}
+      {currentTopicId && selectedRecommendation && activeTab === "recommendations" && recommendations.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp className="w-6 h-6 text-yellow-500" />
@@ -213,113 +407,174 @@ export default function ShortFormConverter({
           </div>
           
           <div className="grid gap-4">
-            {recommendations.map((rec, index) => (
-              <div
-                key={index}
-                onClick={() => handleSelectRecommendation(rec)}
-                className="bg-gradient-to-br from-neutral-800 to-neutral-900 border-2 border-neutral-600 hover:border-yellow-500 rounded-xl p-6 cursor-pointer transition-all hover:shadow-lg hover:shadow-yellow-500/20"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="px-3 py-1 bg-yellow-600 text-white text-xs font-bold rounded-full">
-                        추천 {index + 1}
-                      </span>
-                      <span className="text-xs text-gray-400">{rec.estimatedViews} 예상</span>
+            {recommendations.map((rec: any, index) => {
+              const isSelected = selectedRecommendation && 
+                selectedRecommendation.title === rec.title && 
+                selectedRecommendation.angle === rec.angle;
+              
+              return (
+                <div
+                  key={index}
+                  onClick={() => handleSelectRecommendation(rec)}
+                  className={`bg-gradient-to-br from-neutral-800 to-neutral-900 rounded-xl p-6 cursor-pointer transition-all hover:shadow-lg hover:shadow-yellow-500/20 ${
+                    isSelected 
+                      ? 'border-2 border-green-500' 
+                      : 'border-2 border-neutral-600 hover:border-yellow-500'
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`px-3 py-1 text-white text-xs font-bold rounded-full ${
+                          isSelected ? 'bg-green-600' : 'bg-yellow-600'
+                        }`}>
+                          {isSelected ? '✓ 선택됨' : `추천 ${index + 1}`}
+                        </span>
+                        <span className="text-xs text-gray-400">{rec.estimatedViews} 예상</span>
+                      </div>
+                      <h4 className="text-lg font-bold text-white mb-2">{rec.title}</h4>
                     </div>
-                    <h4 className="text-lg font-bold text-white mb-2">{rec.title}</h4>
+                  </div>
+                  
+                  <div className="space-y-2 mb-4">
+                    <div className="flex items-start gap-2">
+                      <span className="text-xs font-bold text-yellow-400 mt-1">Hook:</span>
+                      <p className="text-sm text-gray-300 flex-1">{rec.hook}</p>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-xs font-bold text-blue-400 mt-1">각도:</span>
+                      <p className="text-sm text-gray-300 flex-1">{rec.angle}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-end">
+                    <button className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors ${
+                      isSelected 
+                        ? 'bg-green-600 hover:bg-green-500' 
+                        : 'bg-yellow-600 hover:bg-yellow-500'
+                    }`}>
+                      <Zap className="w-4 h-4" />
+                      {isSelected ? '대본 보기' : '이 대본 선택'}
+                    </button>
                   </div>
                 </div>
-                
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-start gap-2">
-                    <span className="text-xs font-bold text-yellow-400 mt-1">Hook:</span>
-                    <p className="text-sm text-gray-300 flex-1">{rec.hook}</p>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-xs font-bold text-blue-400 mt-1">각도:</span>
-                    <p className="text-sm text-gray-300 flex-1">{rec.angle}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-end">
-                  <button className="flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg text-sm font-medium transition-colors">
-                    <Zap className="w-4 h-4" />
-                    이 대본 선택
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
       {/* Short Form Output */}
-      {shortFormOutput && selectedRecommendation && (
+      {currentScript && selectedRecommendation && activeTab === "selected" && (
         <div className="space-y-3 animate-fadeIn">
-          <div className="bg-neutral-800 border border-neutral-600 rounded-lg p-4 mb-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="px-3 py-1 bg-yellow-600 text-white text-xs font-bold rounded-full">
-                선택된 대본
-              </span>
-              <h4 className="text-lg font-bold text-white">{selectedRecommendation.title}</h4>
-            </div>
-            <p className="text-sm text-gray-400">
-              <strong>각도:</strong> {selectedRecommendation.angle}
-            </p>
-            <button
-              onClick={() => {
-                setSelectedRecommendation(null);
-                setShortFormOutput("");
-              }}
-              className="mt-3 text-sm text-blue-400 hover:text-blue-300 underline"
-            >
-              ← 다른 추천 대본 보기
-            </button>
-          </div>
-          
           <div className="flex items-center justify-between">
             <label className="text-lg font-semibold text-white flex items-center gap-2">
               <Zap className="w-5 h-5 text-yellow-500" />
               숏폼 대본 (30~60초)
             </label>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowRefineModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors font-medium"
-              >
-                <Edit2 className="w-4 h-4" />
-                수정
-              </button>
-              <button
-                onClick={handleCopy}
-                className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
-              >
-                {copied ? (
-                  <>
+              {!isEditing && (
+                <>
+                  <button
+                    onClick={handleDirectEdit}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors font-medium"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    직접 수정
+                  </button>
+                  <button
+                    onClick={() => setShowRefineModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors font-medium"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    AI 수정
+                  </button>
+                  <button
+                    onClick={handleCopy}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
+                  >
+                    {copied ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" />
+                        복사됨!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4" />
+                        복사하기
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
+              {isEditing && (
+                <>
+                  <button
+                    onClick={handleSaveEdit}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors font-medium"
+                  >
                     <CheckCircle2 className="w-4 h-4" />
-                    복사됨!
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-4 h-4" />
-                    복사하기
-                  </>
-                )}
-              </button>
+                    저장
+                  </button>
+                  <button
+                    onClick={handleCancelEdit}
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-colors font-medium"
+                  >
+                    취소
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-neutral-800 to-neutral-900 border-2 border-yellow-500 rounded-lg p-6 shadow-lg">
-            <div 
-              className="prose prose-invert max-w-none whitespace-pre-wrap text-white text-base leading-relaxed"
-              dangerouslySetInnerHTML={{
-                __html: shortFormOutput
-                  .replace(/\*\*(.*?)\*\*/g, '<strong class="text-yellow-300">$1</strong>')
-                  .replace(/\n/g, '<br/>')
-              }}
+          {isEditing ? (
+            <textarea
+              value={editedScript}
+              onChange={(e) => setEditedScript(e.target.value)}
+              className="w-full h-96 p-4 border-2 border-green-500 bg-neutral-800 text-white rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none text-base leading-relaxed"
             />
-          </div>
+          ) : (
+            <div className="bg-gradient-to-br from-neutral-800 to-neutral-900 border-2 border-yellow-500 rounded-lg p-6 shadow-lg">
+              <div 
+                className="prose prose-invert max-w-none whitespace-pre-wrap text-white text-base leading-relaxed"
+                dangerouslySetInnerHTML={{
+                  __html: getCurrentScript()
+                    .replace(/\*\*(.*?)\*\*/g, '<strong class="text-yellow-300">$1</strong>')
+                    .replace(/\n/g, '<br/>')
+                }}
+              />
+            </div>
+          )}
+
+          {/* 버전 히스토리 */}
+          {versions.length > 1 && (
+            <div className="p-4 bg-neutral-900 border border-neutral-600 rounded-lg">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-sm text-gray-400 font-medium">대본 버전:</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {versions.map((version, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleVersionChange(index)}
+                    className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                      currentVersion === index
+                        ? 'bg-yellow-600 text-white border-2 border-yellow-400'
+                        : 'bg-neutral-800 text-gray-300 border border-neutral-600 hover:bg-neutral-700'
+                    }`}
+                    title={version.instruction || '원본 대본'}
+                  >
+                    {index + 1}
+                  </button>
+                ))}
+              </div>
+              {versions[currentVersion]?.instruction && (
+                <div className="mt-3 text-xs text-gray-400 bg-neutral-800 rounded p-2 border border-neutral-700">
+                  <strong>수정 내용:</strong> {versions[currentVersion].instruction}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <p className="text-sm text-yellow-800">
@@ -336,7 +591,7 @@ export default function ShortFormConverter({
           <div className="bg-neutral-900 rounded-xl border border-neutral-600 max-w-2xl w-full p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
               <Edit2 size={24} className="text-blue-400" />
-              숏폼 대본 수정하기
+              숏폼 대본 AI 수정하기
             </h3>
             
             <p className="text-gray-300 mb-4 text-sm">
@@ -381,7 +636,7 @@ export default function ShortFormConverter({
                     수정 중...
                   </>
                 ) : (
-                  '대본 수정하기'
+                  'AI 수정하기'
                 )}
               </button>
             </div>

@@ -103,3 +103,18 @@ export interface ShortFormScript {
   script: string;
 }
 
+export interface ShortFormVersion {
+  version: number;
+  script: string;
+  timestamp: number;
+  instruction?: string; // 수정 내용
+}
+
+export interface ShortFormData {
+  recommendations: ShortFormRecommendation[];
+  selectedRecommendation: ShortFormRecommendation | null;
+  currentScript: string;
+  versions: ShortFormVersion[];
+  currentVersion: number;
+}
+
