@@ -11,18 +11,45 @@ interface Props {
 }
 
 const ScriptEditor: React.FC<Props> = ({ script, onReset, onBack, onUpdate }) => {
-  const [copied, setCopied] = useState(false);
+  const [copiedTitle, setCopiedTitle] = useState(false);
+  const [copiedDescription, setCopiedDescription] = useState(false);
+  const [copiedHashtags, setCopiedHashtags] = useState(false);
+  const [copiedScript, setCopiedScript] = useState(false);
   const [showRefineModal, setShowRefineModal] = useState(false);
   const [refineInstruction, setRefineInstruction] = useState('');
   const [isRefining, setIsRefining] = useState(false);
   const [currentVersion, setCurrentVersion] = useState(script.currentVersion || 0);
 
-  const handleCopy = () => {
+  const handleCopyTitle = () => {
+    if (script.youtubeTitle) {
+      navigator.clipboard.writeText(script.youtubeTitle);
+      setCopiedTitle(true);
+      setTimeout(() => setCopiedTitle(false), 2000);
+    }
+  };
+
+  const handleCopyDescription = () => {
+    if (script.youtubeDescription) {
+      navigator.clipboard.writeText(script.youtubeDescription);
+      setCopiedDescription(true);
+      setTimeout(() => setCopiedDescription(false), 2000);
+    }
+  };
+
+  const handleCopyHashtags = () => {
+    if (script.hashtags && script.hashtags.length > 0) {
+      navigator.clipboard.writeText(script.hashtags.join(' '));
+      setCopiedHashtags(true);
+      setTimeout(() => setCopiedHashtags(false), 2000);
+    }
+  };
+
+  const handleCopyScript = () => {
     const content = getCurrentContent();
     const fullText = `# ${script.title}\n\n${content}`;
     navigator.clipboard.writeText(fullText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopiedScript(true);
+    setTimeout(() => setCopiedScript(false), 2000);
   };
 
   const handleRefine = async () => {
@@ -110,32 +137,24 @@ const ScriptEditor: React.FC<Props> = ({ script, onReset, onBack, onUpdate }) =>
             {onBack && (
               <button
                 onClick={onBack}
-                className="flex items-center gap-2 px-3 py-2 bg-neutral-700 hover:bg-neutral-600 text-gray-100 rounded-lg text-sm transition-colors border border-neutral-500 font-medium hover:border-neutral-400"
+                className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg text-sm transition-colors font-medium"
               >
                 <ArrowLeft size={16} />
-                이전으로
+                이전
               </button>
             )}
             
             <button
               onClick={() => setShowRefineModal(true)}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded-lg text-sm transition-colors font-medium"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm transition-colors font-medium"
             >
               <Edit2 size={16} />
-              대본 수정
-            </button>
-            
-            <button
-              onClick={handleCopy}
-              className="flex items-center gap-2 px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-gray-100 rounded-lg text-sm transition-colors border border-neutral-500 font-medium hover:border-neutral-400"
-            >
-              {copied ? <Check size={16} className="text-green-400" /> : <Copy size={16} />}
-              {copied ? '복사됨' : '복사'}
+              수정
             </button>
 
             <button
               onClick={onReset}
-              className="flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-sm transition-colors font-bold shadow-md hover:shadow-purple-500/20"
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-sm transition-colors font-medium"
             >
               <Home size={16} />
               홈
@@ -153,7 +172,16 @@ const ScriptEditor: React.FC<Props> = ({ script, onReset, onBack, onUpdate }) =>
             
             {script.youtubeTitle && (
               <div className="mb-4">
-                <label className="text-xs text-gray-400 font-bold block mb-1">영상 제목</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-gray-400 font-bold">영상 제목</label>
+                  <button
+                    onClick={handleCopyTitle}
+                    className="flex items-center gap-1 px-3 py-1 bg-green-600 hover:bg-green-500 text-white rounded text-xs transition-colors font-medium"
+                  >
+                    {copiedTitle ? <Check size={12} /> : <Copy size={12} />}
+                    {copiedTitle ? '복사됨' : '복사'}
+                  </button>
+                </div>
                 <div className="bg-neutral-800 border border-neutral-600 rounded-lg p-3 text-white font-medium">
                   {script.youtubeTitle}
                 </div>
@@ -162,7 +190,16 @@ const ScriptEditor: React.FC<Props> = ({ script, onReset, onBack, onUpdate }) =>
             
             {script.youtubeDescription && (
               <div className="mb-4">
-                <label className="text-xs text-gray-400 font-bold block mb-1">설명</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-gray-400 font-bold">설명</label>
+                  <button
+                    onClick={handleCopyDescription}
+                    className="flex items-center gap-1 px-3 py-1 bg-green-600 hover:bg-green-500 text-white rounded text-xs transition-colors font-medium"
+                  >
+                    {copiedDescription ? <Check size={12} /> : <Copy size={12} />}
+                    {copiedDescription ? '복사됨' : '복사'}
+                  </button>
+                </div>
                 <div className="bg-neutral-800 border border-neutral-600 rounded-lg p-3 text-gray-200 text-sm leading-relaxed">
                   {script.youtubeDescription}
                 </div>
@@ -171,10 +208,19 @@ const ScriptEditor: React.FC<Props> = ({ script, onReset, onBack, onUpdate }) =>
             
             {script.hashtags && script.hashtags.length > 0 && (
               <div>
-                <label className="text-xs text-gray-400 font-bold block mb-2 flex items-center gap-1">
-                  <Hash size={14} />
-                  해시태그
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs text-gray-400 font-bold flex items-center gap-1">
+                    <Hash size={14} />
+                    해시태그
+                  </label>
+                  <button
+                    onClick={handleCopyHashtags}
+                    className="flex items-center gap-1 px-3 py-1 bg-green-600 hover:bg-green-500 text-white rounded text-xs transition-colors font-medium"
+                  >
+                    {copiedHashtags ? <Check size={12} /> : <Copy size={12} />}
+                    {copiedHashtags ? '복사됨' : '복사'}
+                  </button>
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {script.hashtags.map((tag, index) => (
                     <span key={index} className="bg-blue-900/30 border border-blue-700 text-blue-200 px-3 py-1 rounded-full text-sm font-medium">
@@ -189,6 +235,16 @@ const ScriptEditor: React.FC<Props> = ({ script, onReset, onBack, onUpdate }) =>
 
         {/* Editor Area */}
         <div className="p-8 bg-neutral-800 min-h-[60vh]">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-sm font-bold text-gray-300">대본 본문</h3>
+            <button
+              onClick={handleCopyScript}
+              className="flex items-center gap-1 px-3 py-1 bg-green-600 hover:bg-green-500 text-white rounded text-xs transition-colors font-medium"
+            >
+              {copiedScript ? <Check size={12} /> : <Copy size={12} />}
+              {copiedScript ? '복사됨' : '복사'}
+            </button>
+          </div>
           <div className="prose prose-invert max-w-none prose-headings:text-purple-300 prose-p:text-gray-100 prose-strong:text-white prose-li:text-gray-200 prose-blockquote:text-gray-300 prose-blockquote:border-purple-500">
             <h1 className="text-3xl font-extrabold mb-8 pb-4 border-b border-neutral-600 leading-tight text-white">{script.title}</h1>
             <div className="whitespace-pre-wrap font-sans text-lg leading-loose text-white">

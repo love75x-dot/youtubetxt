@@ -7,7 +7,7 @@ import TopicSelector from './components/TopicSelector';
 import ScriptEditor from './components/ScriptEditor';
 import ShortFormConverter from './components/ShortFormConverter';
 
-type AppMode = 'analysis' | 'shortform';
+type AppMode = 'analysis' | 'shortform' | 'longform';
 
 const App: React.FC = () => {
   const [mode, setMode] = useState<AppMode>('analysis');
@@ -20,6 +20,7 @@ const App: React.FC = () => {
   const [generatedScript, setGeneratedScript] = useState<GeneratedScript | null>(null);
   const [scriptCache, setScriptCache] = useState<Map<string, GeneratedScript>>(new Map());
   const [error, setError] = useState<string | null>(null);
+  const [hasGeneratedScript, setHasGeneratedScript] = useState(false);
 
   // Check for API key on mount
   React.useEffect(() => {
@@ -67,6 +68,8 @@ const App: React.FC = () => {
     if (cachedScript) {
       setGeneratedScript(cachedScript);
       setStep(AppStep.RESULT);
+      setMode('longform');
+      setHasGeneratedScript(true);
       return;
     }
     
@@ -81,6 +84,8 @@ const App: React.FC = () => {
       setScriptCache(new Map(scriptCache.set(topic.title, script)));
       
       setStep(AppStep.RESULT);
+      setMode('longform');
+      setHasGeneratedScript(true);
     } catch (err: any) {
       console.error(err);
       setError("대본 작성 중 오류가 발생했습니다.");
@@ -96,10 +101,13 @@ const App: React.FC = () => {
     setGeneratedScript(null);
     setScriptCache(new Map());
     setError(null);
+    setHasGeneratedScript(false);
+    setMode('analysis');
   };
 
   const handleBackToTopics = () => {
     setStep(AppStep.TOPICS);
+    setMode('analysis');
   };
 
   const handleScriptUpdate = (updatedScript: GeneratedScript) => {
@@ -142,7 +150,6 @@ const App: React.FC = () => {
           <button
             onClick={() => {
               setMode('analysis');
-              handleReset();
             }}
             className={`flex-1 px-4 py-2.5 rounded-md font-medium transition-all ${
               mode === 'analysis'
@@ -155,6 +162,23 @@ const App: React.FC = () => {
               <span className="hidden sm:inline">분석 & 생성</span>
             </span>
           </button>
+          {hasGeneratedScript && (
+            <button
+              onClick={() => {
+                setMode('longform');
+              }}
+              className={`flex-1 px-4 py-2.5 rounded-md font-medium transition-all ${
+                mode === 'longform'
+                  ? 'bg-purple-600 text-white'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <span className="flex items-center justify-center gap-2">
+                <FileText size={18} />
+                <span className="hidden sm:inline">롱폼대본</span>
+              </span>
+            </button>
+          )}
           <button
             onClick={() => {
               setMode('shortform');
@@ -167,7 +191,7 @@ const App: React.FC = () => {
           >
             <span className="flex items-center justify-center gap-2">
               <Zap size={18} />
-              <span className="hidden sm:inline">숏폼 변환</span>
+              <span className="hidden sm:inline">숏폼 대본 변환</span>
             </span>
           </button>
         </div>
@@ -276,7 +300,14 @@ const App: React.FC = () => {
 
       <main className="container mx-auto px-4 py-12">
         {mode === 'shortform' ? (
-          <ShortFormConverter onBack={() => setMode('analysis')} />
+          <ShortFormConverter onBack={() => setMode(hasGeneratedScript ? 'longform' : 'analysis')} />
+        ) : mode === 'longform' && generatedScript ? (
+          <ScriptEditor 
+            script={generatedScript} 
+            onReset={handleReset} 
+            onBack={handleBackToTopics}
+            onUpdate={handleScriptUpdate}
+          />
         ) : (
           <>
             {step === AppStep.INPUT && renderInputScreen()}
@@ -287,8 +318,8 @@ const App: React.FC = () => {
               <div className="max-w-5xl mx-auto space-y-8">
                 <div className="flex items-center justify-between border-b border-neutral-700 pb-4">
                   <h2 className="text-2xl font-bold text-white">분석 결과 및 추천 주제</h2>
-                  <button onClick={handleReset} className="text-sm text-gray-300 hover:text-white transition-colors underline decoration-dotted font-medium">
-                    처음으로 돌아가기
+                  <button onClick={handleReset} className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg text-sm transition-colors font-medium">
+                    처음으로
                   </button>
                 </div>
                 
@@ -301,15 +332,6 @@ const App: React.FC = () => {
             )}
 
             {step === AppStep.GENERATING && renderLoadingOverlay("AI가 롱폼 대본을 작성하고 있습니다 (10,000자, 17~20분)...")}
-
-            {step === AppStep.RESULT && generatedScript && (
-              <ScriptEditor 
-                script={generatedScript} 
-                onReset={handleReset} 
-                onBack={handleBackToTopics}
-                onUpdate={handleScriptUpdate}
-              />
-            )}
           </>
         )}
       </main>

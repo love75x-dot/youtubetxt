@@ -46,14 +46,14 @@ export default function ShortFormConverter({ onBack }: ShortFormConverterProps) 
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors font-medium"
           >
             <ArrowLeft className="w-4 h-4" />
             홈
           </button>
           <div className="flex items-center gap-2">
             <Zap className="w-6 h-6 text-yellow-500" />
-            <h2 className="text-2xl font-bold">숏폼 대본 변환</h2>
+            <h2 className="text-2xl font-bold text-white">숏폼 대본 변환</h2>
           </div>
         </div>
       </div>
@@ -76,7 +76,7 @@ export default function ShortFormConverter({ onBack }: ShortFormConverterProps) 
           value={longFormInput}
           onChange={(e) => setLongFormInput(e.target.value)}
           placeholder="롱폼 유튜브 대본을 여기에 붙여넣기 하세요...&#10;&#10;예시:&#10;SESSION1: 오프닝&#10;여러분, 오늘은 정말 중요한 이야기를 해보려고 합니다.&#10;많은 분들이 궁금해하시던...&#10;&#10;(전체 대본 내용)"
-          className="w-full h-64 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none font-mono text-sm"
+          className="w-full h-64 p-4 border-2 border-gray-600 bg-neutral-800 text-white rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent resize-none text-base leading-relaxed placeholder-gray-500"
           disabled={isConverting}
         />
         <div className="flex items-center justify-between">
@@ -146,12 +146,12 @@ export default function ShortFormConverter({ onBack }: ShortFormConverterProps) 
             </button>
           </div>
 
-          <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-300 rounded-lg p-6 shadow-lg">
+          <div className="bg-gradient-to-br from-neutral-800 to-neutral-900 border-2 border-yellow-500 rounded-lg p-6 shadow-lg">
             <div 
-              className="prose prose-sm max-w-none whitespace-pre-wrap"
+              className="prose prose-invert max-w-none whitespace-pre-wrap text-white text-base leading-relaxed"
               dangerouslySetInnerHTML={{
                 __html: shortFormScript
-                  .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                  .replace(/\*\*(.*?)\*\*/g, '<strong class="text-yellow-300">$1</strong>')
                   .replace(/\n/g, '<br/>')
               }}
             />
