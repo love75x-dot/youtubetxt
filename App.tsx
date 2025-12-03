@@ -14,6 +14,7 @@ const App: React.FC = () => {
   const [analysis, setAnalysis] = useState<ScriptAnalysis | null>(null);
   const [topics, setTopics] = useState<TopicRecommendation[]>([]);
   const [generatedScript, setGeneratedScript] = useState<GeneratedScript | null>(null);
+  const [scriptCache, setScriptCache] = useState<Map<string, GeneratedScript>>(new Map());
   const [error, setError] = useState<string | null>(null);
 
   // Check for API key on mount
@@ -57,15 +58,24 @@ const App: React.FC = () => {
   const handleGenerateScript = async (topic: TopicRecommendation) => {
     if (!analysis) return;
     
+    // 캐시에서 확인
+    const cachedScript = scriptCache.get(topic.title);
+    if (cachedScript) {
+      setGeneratedScript(cachedScript);
+      setStep(AppStep.RESULT);
+      return;
+    }
+    
     setStep(AppStep.GENERATING);
     setError(null);
 
     try {
-      const content = await writeNewScript(topic, analysis);
-      setGeneratedScript({
-        title: topic.title,
-        content: content
-      });
+      const script = await writeNewScript(topic, analysis);
+      setGeneratedScript(script);
+      
+      // 캐시에 저장
+      setScriptCache(new Map(scriptCache.set(topic.title, script)));
+      
       setStep(AppStep.RESULT);
     } catch (err: any) {
       console.error(err);
@@ -80,11 +90,21 @@ const App: React.FC = () => {
     setAnalysis(null);
     setTopics([]);
     setGeneratedScript(null);
+    setScriptCache(new Map());
     setError(null);
   };
 
   const handleBackToTopics = () => {
     setStep(AppStep.TOPICS);
+  };
+
+  const handleScriptUpdate = (updatedScript: GeneratedScript) => {
+    setGeneratedScript(updatedScript);
+    // 캐시도 업데이트
+    if (updatedScript.topicId) {
+      const topicTitle = updatedScript.title;
+      setScriptCache(new Map(scriptCache.set(topicTitle, updatedScript)));
+    }
   };
 
   // Render Helpers
@@ -233,7 +253,12 @@ const App: React.FC = () => {
         {step === AppStep.GENERATING && renderLoadingOverlay("AI가 30초 룰을 적용한 맞춤형 대본을 작성하고 있습니다...")}
 
         {step === AppStep.RESULT && generatedScript && (
-          <ScriptEditor script={generatedScript} onReset={handleReset} onBack={handleBackToTopics} />
+          <ScriptEditor 
+            script={generatedScript} 
+            onReset={handleReset} 
+            onBack={handleBackToTopics}
+            onUpdate={handleScriptUpdate}
+          />
         )}
       </main>
     </div>

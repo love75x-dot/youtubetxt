@@ -25,6 +25,15 @@ export enum AppStep {
 export interface GeneratedScript {
   title: string;
   content: string;
+  youtubeTitle?: string;
+  youtubeDescription?: string;
+  hashtags?: string[];
+  topicId?: string; // 주제 식별을 위한 ID
+}
+
+export interface ScriptRefinementRequest {
+  currentScript: string;
+  instruction: string; // 사용자의 수정 요청
 }
 
 export enum ToneType {

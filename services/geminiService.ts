@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { ScriptAnalysis, TopicRecommendation, HookScript, HookScriptRequest, ToneType } from "../types";
+import { ScriptAnalysis, TopicRecommendation, HookScript, HookScriptRequest, ToneType, GeneratedScript, ScriptRefinementRequest } from "../types";
 
 // Helper to get API key from multiple sources
 const getApiKey = (): string => {
@@ -99,10 +99,10 @@ export const generateTopics = async (analysis: ScriptAnalysis, count: number = 4
   return JSON.parse(response.text) as TopicRecommendation[];
 };
 
-export const writeNewScript = async (topic: TopicRecommendation, analysis: ScriptAnalysis): Promise<string> => {
+export const writeNewScript = async (topic: TopicRecommendation, analysis: ScriptAnalysis): Promise<GeneratedScript> => {
   const ai = getAI();
 
-  const prompt = `
+  const scriptPrompt = `
     YouTube 비디오의 완전한 대본을 작성해주세요. 특히 첫 30초가 매우 중요합니다.
 
     주제: "${topic.title}"
@@ -143,14 +143,57 @@ export const writeNewScript = async (topic: TopicRecommendation, analysis: Scrip
     대본을 마크다운 형식으로 작성해주세요.
   `;
 
-  const response = await ai.models.generateContent({
+  const scriptResponse = await ai.models.generateContent({
     model: "gemini-2.5-flash",
-    contents: prompt,
-    // We want free-form Markdown text for the script, not JSON
+    contents: scriptPrompt,
   });
 
-  if (!response.text) throw new Error("No script generated");
-  return response.text;
+  if (!scriptResponse.text) throw new Error("No script generated");
+  const scriptContent = scriptResponse.text;
+
+  // YouTube 메타데이터 생성
+  const metaPrompt = `
+    다음 YouTube 비디오 대본을 바탕으로 최적화된 메타데이터를 생성해주세요.
+
+    대본 주제: "${topic.title}"
+    타겟 시청자: ${analysis.targetAudience}
+    
+    다음을 생성해주세요:
+    1. YouTube 업로드용 제목 (40-60자, 클릭을 유도하는 제목, 검색량 많은 키워드 포함)
+    2. YouTube 설명란 내용 (200-300자, 영상 요약 + 시청 유도 + 관련 키워드 포함)
+    3. 해시태그 (5-8개, 검색량 많은 키워드 위주, # 포함)
+
+    JSON 형식으로 응답해주세요.
+  `;
+
+  const metaResponse = await ai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: metaPrompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          youtubeTitle: { type: Type.STRING, description: "YouTube 업로드용 최적화된 제목" },
+          youtubeDescription: { type: Type.STRING, description: "YouTube 설명란 내용" },
+          hashtags: { type: Type.ARRAY, items: { type: Type.STRING }, description: "해시태그 배열" }
+        },
+        required: ["youtubeTitle", "youtubeDescription", "hashtags"]
+      }
+    }
+  });
+
+  if (!metaResponse.text) throw new Error("No metadata generated");
+  const metadata = JSON.parse(metaResponse.text);
+
+  return {
+    title: topic.title,
+    content: scriptContent,
+    youtubeTitle: metadata.youtubeTitle,
+    youtubeDescription: metadata.youtubeDescription,
+    hashtags: metadata.hashtags,
+    topicId: `${topic.title}-${Date.now()}`
+  };
 };
 
 const getToneDescription = (tone: ToneType): string => {
@@ -235,5 +278,36 @@ export const generate30SecondHook = async (request: HookScriptRequest): Promise<
 
   if (!response.text) throw new Error("No hook script generated");
   return JSON.parse(response.text) as HookScript;
+};
+
+export const refineScript = async (request: ScriptRefinementRequest): Promise<string> => {
+  const ai = getAI();
+
+  const prompt = `
+    다음 YouTube 대본을 사용자의 요청에 따라 수정해주세요.
+
+    **현재 대본:**
+    ${request.currentScript}
+
+    **사용자 수정 요청:**
+    ${request.instruction}
+
+    **수정 규칙:**
+    - 사용자의 요청을 정확히 반영할 것
+    - 기존 대본의 30초 룰 구조([0-5초], [5-15초], [15-30초])는 유지할 것
+    - 톤앤매너 변경 요청이 있으면 전체적으로 일관되게 적용할 것
+    - 분량 조절 요청 시 핵심 내용은 유지하면서 조정할 것
+    - 수정된 대본을 마크다운 형식으로 작성할 것
+
+    수정된 대본만 출력해주세요.
+  `;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: prompt,
+  });
+
+  if (!response.text) throw new Error("No refined script generated");
+  return response.text;
 };
 
