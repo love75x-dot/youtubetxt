@@ -1,13 +1,13 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ScriptAnalysis, TopicRecommendation } from "../types";
 
-const apiKey = process.env.API_KEY;
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
 // Helper to ensure we have a key (though app structure guarantees it via environment usually)
 const getAI = () => {
   if (!apiKey) {
-    console.error("API_KEY is missing");
-    throw new Error("API Key is missing");
+    console.error("VITE_GEMINI_API_KEY is missing");
+    throw new Error("API Key is missing. Please add VITE_GEMINI_API_KEY to your .env file");
   }
   return new GoogleGenAI({ apiKey });
 };
