@@ -1,0 +1,5 @@
+{
+  "name": "유튜브 대본 AI",
+  "description": "유튜브 대본 분석, 주제 추천 및 AI 대본 생성기 (Gemini 기반)",
+  "requestFramePermissions": []
+}
