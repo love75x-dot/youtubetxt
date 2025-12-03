@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { Wand2, Youtube, FileText, Loader2, AlertCircle, Film, Image } from 'lucide-react';
+import { Wand2, Youtube, FileText, Loader2, AlertCircle, Zap } from 'lucide-react';
 import { analyzeScript, generateTopics, writeNewScript } from './services/geminiService';
 import { AppStep, ScriptAnalysis, TopicRecommendation, GeneratedScript } from './types';
 import AnalysisDisplay from './components/AnalysisDisplay';
 import TopicSelector from './components/TopicSelector';
 import ScriptEditor from './components/ScriptEditor';
-import LongFormScriptGenerator from './components/LongFormScriptGenerator';
+import ShortFormConverter from './components/ShortFormConverter';
 
-type AppMode = 'analysis' | 'longform' | 'thumbnail';
+type AppMode = 'analysis' | 'shortform';
 
 const App: React.FC = () => {
   const [mode, setMode] = useState<AppMode>('analysis');
@@ -157,34 +157,17 @@ const App: React.FC = () => {
           </button>
           <button
             onClick={() => {
-              setMode('longform');
-              handleReset();
+              setMode('shortform');
             }}
             className={`flex-1 px-4 py-2.5 rounded-md font-medium transition-all ${
-              mode === 'longform'
+              mode === 'shortform'
                 ? 'bg-purple-600 text-white'
                 : 'text-gray-400 hover:text-white'
             }`}
           >
             <span className="flex items-center justify-center gap-2">
-              <Film size={18} />
-              <span className="hidden sm:inline">롱폼 1만자</span>
-            </span>
-          </button>
-          <button
-            onClick={() => {
-              setMode('thumbnail');
-              handleReset();
-            }}
-            className={`flex-1 px-4 py-2.5 rounded-md font-medium transition-all ${
-              mode === 'thumbnail'
-                ? 'bg-purple-600 text-white'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            <span className="flex items-center justify-center gap-2">
-              <Image size={18} />
-              <span className="hidden sm:inline">썸네일</span>
+              <Zap size={18} />
+              <span className="hidden sm:inline">숏폼 변환</span>
             </span>
           </button>
         </div>
@@ -292,14 +275,8 @@ const App: React.FC = () => {
       {renderHeader()}
 
       <main className="container mx-auto px-4 py-12">
-        {mode === 'longform' ? (
-          <LongFormScriptGenerator />
-        ) : mode === 'thumbnail' ? (
-          <div className="text-center text-gray-400 py-20">
-            <Image size={64} className="mx-auto mb-4 text-gray-600" />
-            <h3 className="text-2xl font-bold mb-2">썸네일 생성 기능</h3>
-            <p>곧 출시됩니다!</p>
-          </div>
+        {mode === 'shortform' ? (
+          <ShortFormConverter onBack={() => setMode('analysis')} />
         ) : (
           <>
             {step === AppStep.INPUT && renderInputScreen()}
@@ -323,7 +300,7 @@ const App: React.FC = () => {
               </div>
             )}
 
-            {step === AppStep.GENERATING && renderLoadingOverlay("AI가 30초 룰을 적용한 맞춤형 대본을 작성하고 있습니다...")}
+            {step === AppStep.GENERATING && renderLoadingOverlay("AI가 롱폼 대본을 작성하고 있습니다 (10,000자, 17~20분)...")}
 
             {step === AppStep.RESULT && generatedScript && (
               <ScriptEditor 
