@@ -426,40 +426,40 @@ export const convertToShortForm = async (longFormScript: string): Promise<string
   const ai = getAI();
 
   const prompt = `
-    다음 롱폼 유튜브 대본을 숏폼(Shorts/릴스)용으로 변환해주세요.
+    다음 롱폼 유튜브 대본을 분석하고, 이 대본에서 추출할 수 있는 **3~5개의 숏폼 대본 추천안**을 제시해주세요.
 
     **원본 롱폼 대본:**
     ${longFormScript}
 
-    **숏폼 변환 규칙:**
-    1. 길이: 30~60초 분량 (약 150~300자)
-    2. 구조:
-       - 첫 3초: 강력한 Hook (시선 사로잡기)
-       - 중간: 핵심 메시지 1~2개만 전달
-       - 마지막: 빠른 CTA 또는 임팩트 있는 마무리
-    
-    3. 특징:
-       - 불필요한 설명 모두 제거
-       - 짧고 강렬한 문장 사용
-       - 템포가 빠르고 리듬감 있게
-       - 롱폼의 가장 흥미로운 부분만 추출
-       - 시청자가 멈추지 않고 끝까지 보도록 유도
-    
-    4. 톤:
-       - 원본의 톤앤매너는 유지하되 더 강렬하게
-       - 에너지가 높고 다이나믹하게
-    
-    **중요:** 롱폼 대본의 핵심 메시지를 유지하면서 숏폼에 최적화된 형태로 변환하세요.
-    
-    숏폼 대본만 출력해주세요 (마크다운 형식).
+    **추천 규칙:**
+    1. 각 추천안은 다른 관점/각도로 접근할 것
+    2. 각 추천안에는 강력한 Hook(3초 이내)이 포함되어야 함
+    3. 30~60초 분량 (150~300자)
+    4. 각 추천안의 차별점을 명확히 할 것
+
+    **JSON 형식으로 응답:**
+    {
+      "recommendations": [
+        {
+          "title": "숏폼 대본 제목",
+          "hook": "첫 3초 Hook 문장",
+          "angle": "어떤 관점으로 접근하는지 설명",
+          "estimatedViews": "예상 조회수 (예: 10만~50만)",
+          "script": "전체 숏폼 대본 (150~300자)"
+        }
+      ]
+    }
   `;
 
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
     contents: prompt,
+    config: {
+      responseMimeType: "application/json"
+    }
   });
 
-  if (!response.text) throw new Error("No short-form script generated");
+  if (!response.text) throw new Error("No short-form recommendations generated");
   return response.text;
 };
 

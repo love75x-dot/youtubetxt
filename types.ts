@@ -91,3 +91,15 @@ export interface HookScriptRequest {
   keyPoints?: string[];
 }
 
+export interface ShortFormRecommendation {
+  title: string;
+  hook: string;
+  angle: string; // 어떤 관점으로 접근하는지
+  estimatedViews: string; // 예상 조회수
+}
+
+export interface ShortFormScript {
+  recommendation: ShortFormRecommendation;
+  script: string;
+}
+

@@ -171,23 +171,26 @@ const App: React.FC = () => {
               <span className="hidden sm:inline">분석 & 생성</span>
             </span>
           </button>
-          {hasGeneratedScript && (
-            <button
-              onClick={() => {
+          <button
+            onClick={() => {
+              if (hasGeneratedScript) {
                 setMode('longform');
-              }}
-              className={`flex-1 px-4 py-2.5 rounded-md font-medium transition-all ${
-                mode === 'longform'
-                  ? 'bg-purple-600 text-white'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              <span className="flex items-center justify-center gap-2">
-                <FileText size={18} />
-                <span className="hidden sm:inline">롱폼대본</span>
-              </span>
-            </button>
-          )}
+              }
+            }}
+            disabled={!hasGeneratedScript}
+            className={`flex-1 px-4 py-2.5 rounded-md font-medium transition-all ${
+              mode === 'longform'
+                ? 'bg-purple-600 text-white'
+                : hasGeneratedScript
+                ? 'text-gray-400 hover:text-white'
+                : 'text-gray-600 cursor-not-allowed opacity-50'
+            }`}
+          >
+            <span className="flex items-center justify-center gap-2">
+              <FileText size={18} />
+              <span className="hidden sm:inline">롱폼대본</span>
+            </span>
+          </button>
           <button
             onClick={() => {
               setMode('shortform');

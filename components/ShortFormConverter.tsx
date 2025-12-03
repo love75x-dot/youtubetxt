@@ -1,6 +1,14 @@
 import { useState } from "react";
-import { Zap, Copy, CheckCircle2, Sparkles, ArrowLeft, Edit2, Home, Loader2 } from "lucide-react";
+import { Zap, Copy, CheckCircle2, Sparkles, ArrowLeft, Edit2, Home, Loader2, TrendingUp } from "lucide-react";
 import { convertToShortForm, refineShortForm } from "../services/geminiService";
+
+interface ShortFormRecommendation {
+  title: string;
+  hook: string;
+  angle: string;
+  estimatedViews: string;
+  script: string;
+}
 
 interface ShortFormConverterProps {
   onBack: () => void;
@@ -25,6 +33,8 @@ export default function ShortFormConverter({
   const [showRefineModal, setShowRefineModal] = useState(false);
   const [refineInstruction, setRefineInstruction] = useState("");
   const [isRefining, setIsRefining] = useState(false);
+  const [recommendations, setRecommendations] = useState<ShortFormRecommendation[]>([]);
+  const [selectedRecommendation, setSelectedRecommendation] = useState<ShortFormRecommendation | null>(null);
 
   const handleConvert = async () => {
     if (!longFormInput.trim()) {
@@ -34,16 +44,30 @@ export default function ShortFormConverter({
 
     setIsConverting(true);
     setError("");
+    setRecommendations([]);
+    setSelectedRecommendation(null);
     setShortFormOutput("");
 
     try {
       const result = await convertToShortForm(longFormInput);
-      setShortFormOutput(result);
+      const parsed = JSON.parse(result);
+      
+      if (parsed.recommendations && Array.isArray(parsed.recommendations)) {
+        setRecommendations(parsed.recommendations);
+      } else {
+        throw new Error("Invalid response format");
+      }
     } catch (err) {
+      console.error(err);
       setError(err instanceof Error ? err.message : "변환 중 오류가 발생했습니다.");
     } finally {
       setIsConverting(false);
     }
+  };
+
+  const handleSelectRecommendation = (rec: ShortFormRecommendation) => {
+    setSelectedRecommendation(rec);
+    setShortFormOutput(rec.script);
   };
 
   const handleCopy = async () => {
@@ -179,9 +203,81 @@ export default function ShortFormConverter({
         </div>
       )}
 
+      {/* AI 추천 숏폼 대본 */}
+      {recommendations.length > 0 && !selectedRecommendation && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp className="w-6 h-6 text-yellow-500" />
+            <h3 className="text-xl font-bold text-white">AI 추천 숏폼 대본</h3>
+            <span className="text-sm text-gray-400">({recommendations.length}개)</span>
+          </div>
+          
+          <div className="grid gap-4">
+            {recommendations.map((rec, index) => (
+              <div
+                key={index}
+                onClick={() => handleSelectRecommendation(rec)}
+                className="bg-gradient-to-br from-neutral-800 to-neutral-900 border-2 border-neutral-600 hover:border-yellow-500 rounded-xl p-6 cursor-pointer transition-all hover:shadow-lg hover:shadow-yellow-500/20"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="px-3 py-1 bg-yellow-600 text-white text-xs font-bold rounded-full">
+                        추천 {index + 1}
+                      </span>
+                      <span className="text-xs text-gray-400">{rec.estimatedViews} 예상</span>
+                    </div>
+                    <h4 className="text-lg font-bold text-white mb-2">{rec.title}</h4>
+                  </div>
+                </div>
+                
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs font-bold text-yellow-400 mt-1">Hook:</span>
+                    <p className="text-sm text-gray-300 flex-1">{rec.hook}</p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs font-bold text-blue-400 mt-1">각도:</span>
+                    <p className="text-sm text-gray-300 flex-1">{rec.angle}</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-end">
+                  <button className="flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg text-sm font-medium transition-colors">
+                    <Zap className="w-4 h-4" />
+                    이 대본 선택
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Short Form Output */}
-      {shortFormOutput && (
+      {shortFormOutput && selectedRecommendation && (
         <div className="space-y-3 animate-fadeIn">
+          <div className="bg-neutral-800 border border-neutral-600 rounded-lg p-4 mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="px-3 py-1 bg-yellow-600 text-white text-xs font-bold rounded-full">
+                선택된 대본
+              </span>
+              <h4 className="text-lg font-bold text-white">{selectedRecommendation.title}</h4>
+            </div>
+            <p className="text-sm text-gray-400">
+              <strong>각도:</strong> {selectedRecommendation.angle}
+            </p>
+            <button
+              onClick={() => {
+                setSelectedRecommendation(null);
+                setShortFormOutput("");
+              }}
+              className="mt-3 text-sm text-blue-400 hover:text-blue-300 underline"
+            >
+              ← 다른 추천 대본 보기
+            </button>
+          </div>
+          
           <div className="flex items-center justify-between">
             <label className="text-lg font-semibold text-white flex items-center gap-2">
               <Zap className="w-5 h-5 text-yellow-500" />
