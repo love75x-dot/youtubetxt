@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { ScriptAnalysis, TopicRecommendation } from "../types";
+import { ScriptAnalysis, TopicRecommendation, HookScript, HookScriptRequest, ToneType } from "../types";
 
 // Helper to get API key from multiple sources
 const getApiKey = (): string => {
@@ -125,3 +125,88 @@ export const writeNewScript = async (topic: TopicRecommendation, analysis: Scrip
   if (!response.text) throw new Error("No script generated");
   return response.text;
 };
+
+const getToneDescription = (tone: ToneType): string => {
+  switch (tone) {
+    case ToneType.FRIENDLY:
+      return "친근한 옆집 형/누나 같은 말투. 반말 사용, 공감과 위로 중심";
+    case ToneType.PROFESSIONAL:
+      return "논리적이고 전문적인 말투. 존댓말 사용, 데이터와 근거 중심";
+    case ToneType.ENERGETIC:
+      return "텐션 높은 예능 스타일. 과장된 표현, 리액션 중심, 빠른 템포";
+  }
+};
+
+export const generate30SecondHook = async (request: HookScriptRequest): Promise<HookScript> => {
+  const ai = getAI();
+  
+  const toneDesc = getToneDescription(request.tone);
+  const keyPointsText = request.keyPoints && request.keyPoints.length > 0 
+    ? `주요 포인트: ${request.keyPoints.join(', ')}` 
+    : '';
+
+  const prompt = `
+    YouTube 비디오의 완전한 대본을 작성해주세요. 특히 첫 30초가 매우 중요합니다.
+
+    주제: ${request.topic}
+    타겟 시청자: ${request.targetAudience}
+    톤앤매너: ${toneDesc}
+    ${keyPointsText}
+
+    **필수 구조:**
+
+    1. **0-5초 (The Hook)**: 시청자의 호기심, 공포, 욕망을 강력하게 자극하는 한 문장
+       - 예: "당신이 유튜브를 망치는 이유가 딱 하나 있습니다."
+       
+    2. **5-15초 (Retention)**: 이 영상을 끝까지 봐야 하는 명확한 이유와 이득 제시
+       - 예: "이 영상 끝까지 보시면 조회수 2배로 올리는 법을 알게 됩니다."
+       
+    3. **15-30초 (Roadmap)**: 영상의 진행 순서를 간단히 요약하여 신뢰감 제공
+       - 예: "오늘 딱 3가지 단계로 설명드릴게요."
+
+    4. **본문 (Body)**: 3-4개의 핵심 포인트를 다룸
+       - 각 챕터 전환 시 브릿지 멘트 필수 (예: "자, 첫 번째는 알겠죠? 그럼 이걸 어떻게 적용할까요?")
+       - 선택한 톤앤매너를 처음부터 끝까지 일관되게 유지
+       
+    5. **중간 CTA (Mid-CTA)**: 본문 중간에 꿀팁을 준 직후 자연스럽게 좋아요/구독 요청
+       - 예: "이 팁 진짜 유용하죠? 까먹기 전에 좋아요 한번 눌러주세요!"
+       
+    6. **엔딩 CTA (Ending-CTA)**: 영상 마무리에 구독과 다음 영상 시청 유도
+       - 예: "구독하시면 다음 영상에서 더 강력한 팁 알려드릴게요!"
+
+    **중요 규칙:**
+    - 선택한 톤앤매너를 절대 바꾸지 말 것
+    - 브릿지 멘트로 자연스럽게 연결할 것
+    - CTA는 정해진 위치에만 배치할 것
+    - 모든 내용은 한국어로 작성할 것
+
+    JSON 형식으로 응답해주세요.
+  `;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          topic: { type: Type.STRING, description: "영상 주제" },
+          targetAudience: { type: Type.STRING, description: "타겟 시청자" },
+          tone: { type: Type.STRING, description: "톤앤매너 타입" },
+          hook_0_5: { type: Type.STRING, description: "0-5초: The Hook - 강력한 첫 문장" },
+          retention_5_15: { type: Type.STRING, description: "5-15초: Retention - 시청 이유 제시" },
+          roadmap_15_30: { type: Type.STRING, description: "15-30초: Roadmap - 영상 진행 순서" },
+          body: { type: Type.STRING, description: "본문 - 브릿지 멘트 포함, 일관된 톤 유지" },
+          midCTA: { type: Type.STRING, description: "중간 CTA - 자연스러운 좋아요/구독 요청" },
+          endingCTA: { type: Type.STRING, description: "엔딩 CTA - 구독 및 다음 영상 유도" }
+        },
+        required: ["topic", "targetAudience", "tone", "hook_0_5", "retention_5_15", "roadmap_15_30", "body", "midCTA", "endingCTA"]
+      }
+    }
+  });
+
+  if (!response.text) throw new Error("No hook script generated");
+  return JSON.parse(response.text) as HookScript;
+};
+
